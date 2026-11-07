@@ -1,0 +1,12 @@
+package com.dan.terminal.core.security
+
+enum class RecoveryAction {
+    REQUEST_RUNTIME_PERMISSION,
+    REQUEST_SHIZUKU_PERMISSION,
+    OPEN_DEVELOPER_OPTIONS,
+    OPEN_SHIZUKU,
+    OPEN_SHIZUKU_DOWNLOAD,
+    OPEN_APP_SETTINGS,
+    OPEN_TERMUX_DOWNLOAD,
+    VERIFY
+}
