@@ -2,13 +2,30 @@ name: Android CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, 'fix/**', 'build/**', develop ]
   pull_request:
     branches: [ main, develop ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
+  source-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate source tree
+        run: python3 scripts/validate_source_tree.py
+      - name: Check bootstrap script
+        run: bash -n scripts/bootstrap_gradle_wrapper.sh app/src/main/assets/bootstrap/dan_bootstrap.sh
+      - name: Check whitespace
+        run: git diff --check
+
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -18,17 +35,33 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Gradle
+      - name: Install Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
 
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew || true
+      # v3 asks sdkmanager for the retired "tools" package and fails before build.
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
 
-      - name: Unit tests
-        run: ./gradlew testDebugUnitTest --stacktrace
+      - name: Install Android API 36
+        run: sdkmanager --install 'platforms;android-36' 'build-tools;35.0.0'
 
-      - name: Assemble debug APK
-        run: ./gradlew :app:assembleDebug --stacktrace
+      - name: Generate checksum-verified Gradle wrapper
+        run: bash scripts/bootstrap_gradle_wrapper.sh
+
+      - name: Compile and unit test
+        run: ./gradlew :app:assembleDebug testDebugUnitTest lintDebug --stacktrace --no-daemon
+
+      - name: Upload test and lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dan-terminal-build-reports
+          path: |
+            **/build/reports/
+            **/build/test-results/
+          if-no-files-found: warn
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
