@@ -1,10 +1,11 @@
 # Contributing
 
-This is an unverified M0/M1 source baseline. Read `docs/SHIZUKU_REVIEW.md`,
+This is an early M0/M1 implementation. Read `docs/IMPLEMENTATION_STATUS.md`,
+`docs/SHIZUKU_REVIEW.md`,
 `docs/MILESTONE_REPORT_M0_M1.md` and the requirement tracker before changing it.
 
 Use `feature/*`, `fix/*` or `build/*` branches and open pull requests against
-`develop`. `main` is reserved for release promotion. Require at least one human
+`main` while the project uses a single integration branch. Require at least one human
 approval before merge; repository rules must enforce this once published.
 Never force-push or rewrite shared history. Do not create a release tag without
 maintainer approval.

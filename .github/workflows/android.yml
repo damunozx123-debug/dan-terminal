@@ -24,6 +24,8 @@ jobs:
         run: python3 scripts/validate_source_tree.py
       - name: Check bootstrap script
         run: bash -n scripts/bootstrap_gradle_wrapper.sh app/src/main/assets/bootstrap/dan_bootstrap.sh
+      - name: Test bootstrap success and failure
+        run: python3 scripts/test_bootstrap.py
       - name: Check whitespace
         run: git diff --check
 
