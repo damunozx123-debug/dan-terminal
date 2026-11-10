@@ -9,19 +9,28 @@ class AccessRecoveryManager(
 ) {
 
     fun assess(capability: AccessCapability): AccessRequirement {
+        val shizukuCapability = capability == AccessCapability.SHIZUKU_SERVICE ||
+            capability == AccessCapability.SHIZUKU_PERMISSION
+        if (shizukuCapability) shizukuAccess.refresh()
         val granted = when (capability) {
             AccessCapability.BLUETOOTH_SCAN -> permissionBroker.isBluetoothScanGranted()
             AccessCapability.BLUETOOTH_CONNECT -> permissionBroker.isBluetoothConnectGranted()
             AccessCapability.SHIZUKU_SERVICE -> shizukuAccess.isBinderAlive
-            AccessCapability.SHIZUKU_PERMISSION -> shizukuAccess.isPermissionGranted
+            AccessCapability.SHIZUKU_PERMISSION ->
+                shizukuAccess.isBinderAlive && shizukuAccess.isPermissionGranted
             AccessCapability.TERMUX_APP -> termuxAccess.isInstalled()
             AccessCapability.TERMUX_RUN_COMMAND_PERMISSION -> termuxAccess.hasRunCommandPermission()
         }
+        // Retain the requested capability while showing the missing prerequisite.
+        // Starting the service alone must not dismiss a pending permission request.
+        val recoveryCapability = if (shizukuCapability && !shizukuAccess.isBinderAlive) {
+            AccessCapability.SHIZUKU_SERVICE
+        } else capability
         return AccessRequirement(
             capability = capability,
             granted = granted,
-            reason = reason(capability),
-            steps = steps(capability)
+            reason = reason(recoveryCapability),
+            steps = steps(recoveryCapability)
         )
     }
 
