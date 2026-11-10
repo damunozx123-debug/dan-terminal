@@ -2,9 +2,9 @@ name: Android CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, 'feature/**', 'fix/**' ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, develop, 'fix/**' ]
   workflow_dispatch:
 
 permissions:
