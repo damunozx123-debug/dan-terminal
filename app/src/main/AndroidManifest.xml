@@ -43,6 +43,10 @@
             </intent-filter>
         </activity>
 
+        <receiver
+            android:name="com.dan.terminal.feature.termux.TermuxCommandResultReceiver"
+            android:exported="false" />
+
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
             android:authorities="${applicationId}.shizuku"
