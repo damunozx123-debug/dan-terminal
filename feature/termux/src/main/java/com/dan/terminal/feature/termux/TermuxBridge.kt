@@ -33,8 +33,7 @@ class TermuxBridge(private val context: Context) : TermuxAccess {
             putExtra(EXTRA_SESSION_ACTION, sessionAction)
         }
         return runCatching {
-            context.startService(intent)
-            true
+            context.startService(intent) != null
         }.getOrDefault(false)
     }
 
@@ -42,7 +41,8 @@ class TermuxBridge(private val context: Context) : TermuxAccess {
         val encoded = Base64.encodeToString(script.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
         val command = "echo '$encoded' | base64 -d > \$HOME/.dan_bootstrap.sh && " +
             "bash \$HOME/.dan_bootstrap.sh"
-        return runCommand(command, background = true)
+        // Keep installation progress and package-manager prompts visible in Termux.
+        return runCommand(command, background = false)
     }
 
     fun loadBootstrapScript(): String =

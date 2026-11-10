@@ -1,5 +1,8 @@
 # M0/M1 Baseline Intake Report
 
+> Historical intake report. For current build and implementation evidence, see
+> [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
+
 Date: 2026-11-05
 Status: source reconstructed; build and acceptance criteria unverified.
 

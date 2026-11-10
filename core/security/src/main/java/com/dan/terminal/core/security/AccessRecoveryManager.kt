@@ -9,19 +9,28 @@ class AccessRecoveryManager(
 ) {
 
     fun assess(capability: AccessCapability): AccessRequirement {
+        val shizukuCapability = capability == AccessCapability.SHIZUKU_SERVICE ||
+            capability == AccessCapability.SHIZUKU_PERMISSION
+        if (shizukuCapability) shizukuAccess.refresh()
         val granted = when (capability) {
             AccessCapability.BLUETOOTH_SCAN -> permissionBroker.isBluetoothScanGranted()
             AccessCapability.BLUETOOTH_CONNECT -> permissionBroker.isBluetoothConnectGranted()
             AccessCapability.SHIZUKU_SERVICE -> shizukuAccess.isBinderAlive
-            AccessCapability.SHIZUKU_PERMISSION -> shizukuAccess.isPermissionGranted
+            AccessCapability.SHIZUKU_PERMISSION ->
+                shizukuAccess.isBinderAlive && shizukuAccess.isPermissionGranted
             AccessCapability.TERMUX_APP -> termuxAccess.isInstalled()
             AccessCapability.TERMUX_RUN_COMMAND_PERMISSION -> termuxAccess.hasRunCommandPermission()
         }
+        // Retain the requested capability while showing the missing prerequisite.
+        // Starting the service alone must not dismiss a pending permission request.
+        val recoveryCapability = if (shizukuCapability && !shizukuAccess.isBinderAlive) {
+            AccessCapability.SHIZUKU_SERVICE
+        } else capability
         return AccessRequirement(
             capability = capability,
             granted = granted,
-            reason = reason(capability),
-            steps = steps(capability)
+            reason = reason(recoveryCapability),
+            steps = steps(recoveryCapability)
         )
     }
 
@@ -45,12 +54,14 @@ class AccessRecoveryManager(
         AccessCapability.BLUETOOTH_CONNECT -> buildList {
             add(
                 RecoveryStep(
-                    "Grant nearby-device permission",
-                    "Android 12+ requires BLUETOOTH_SCAN and BLUETOOTH_CONNECT at runtime.",
+                    "Grant access",
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+                        "Allow Nearby devices for this Bluetooth operation."
+                    else "Allow Location access for BLE scanning on Android 11 and below.",
                     RecoveryAction.REQUEST_RUNTIME_PERMISSION
                 )
             )
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            if (capability == AccessCapability.BLUETOOTH_SCAN && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
                 add(
                     RecoveryStep(
                         "Enable Location services",
@@ -58,6 +69,13 @@ class AccessRecoveryManager(
                     )
                 )
             }
+            add(
+                RecoveryStep(
+                    "Review denied permissions",
+                    "If Android no longer shows the permission prompt, open DAN Terminal's Permissions in App Info.",
+                    RecoveryAction.OPEN_APP_SETTINGS
+                )
+            )
             add(
                 RecoveryStep(
                     "Verify access",
@@ -116,7 +134,7 @@ class AccessRecoveryManager(
         AccessCapability.TERMUX_APP -> listOf(
             RecoveryStep(
                 "Install Termux",
-                "Install Termux from F-Droid or the official GitHub release. Google Play builds are deprecated.",
+                "Install the supported Termux build from F-Droid or the official GitHub releases.",
                 RecoveryAction.OPEN_TERMUX_DOWNLOAD
             ),
             RecoveryStep(
@@ -129,12 +147,17 @@ class AccessRecoveryManager(
         AccessCapability.TERMUX_RUN_COMMAND_PERMISSION -> listOf(
             RecoveryStep(
                 "Grant RUN_COMMAND permission",
+                "Allow DAN Terminal to run commands in the Termux environment.",
+                RecoveryAction.REQUEST_RUNTIME_PERMISSION
+            ),
+            RecoveryStep(
+                "Review denied permission",
                 "Open DAN Terminal App Info -> Permissions and allow 'Run commands in Termux environment'.",
                 RecoveryAction.OPEN_APP_SETTINGS
             ),
             RecoveryStep(
                 "Allow external apps in Termux",
-                "In Termux, run: echo 'allow-external-apps=true' >> ~/.termux/termux.properties && termux-reload-settings"
+                "In Termux, run: mkdir -p ~/.termux && echo 'allow-external-apps=true' >> ~/.termux/termux.properties && termux-reload-settings"
             ),
             RecoveryStep(
                 "Verify permission",

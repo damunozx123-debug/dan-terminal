@@ -13,5 +13,9 @@ All notable changes to this project are documented here.
 - Corrected Termux RUN_COMMAND executable-path and argument separation.
 - Added a GATT read-value cache for API 33+ and the legacy callback.
 
+### Fixed
+- Reviewed Shizuku service/permission recovery, denial handling, callback synchronization and listener lifecycle (source only; H08/P01/P02/P04).
+- Added fake-API regression tests for the permission flow; execution is blocked by the missing wrapper.
+
 ### Verification
 - Not compiled or tested in this environment. See docs/MILESTONE_REPORT_M0_M1.md.

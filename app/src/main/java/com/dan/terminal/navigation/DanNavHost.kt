@@ -1,6 +1,7 @@
 package com.dan.terminal.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -11,6 +12,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.dan.terminal.core.bluetooth.BleDevice
 import com.dan.terminal.core.security.AccessRequiredDialog
+import com.dan.terminal.core.security.AccessCapability
 import com.dan.terminal.di.LocalAppContainer
 import com.dan.terminal.feature.bluetooth.BluetoothScreen
 import com.dan.terminal.feature.bluetooth.GattScreen
@@ -26,14 +28,26 @@ fun DanNavHost() {
         .activeRequirement
         .collectAsState()
     var selectedDevice by remember { mutableStateOf<BleDevice?>(null) }
+    val shizuku by container.shizukuManager.state.collectAsState()
+    LaunchedEffect(shizuku.binderAlive, shizuku.permissionGranted, shizuku.preV11) {
+        container.accessCoordinator.verifyPending()
+    }
 
     activeRequirement?.let { requirement ->
+        val needsShizuku = requirement.capability == AccessCapability.SHIZUKU_SERVICE ||
+            requirement.capability == AccessCapability.SHIZUKU_PERMISSION
         AccessRequiredDialog(
             requirement = requirement,
             coordinator = container.accessCoordinator,
             permissionBroker = container.permissionBroker,
             onOpenShizukuApp = { container.shizukuManager.openShizukuApp() },
             onOpenShizukuDownload = { container.shizukuManager.openShizukuDownload() },
+            shizukuMessage = if (needsShizuku) shizuku.lastError else null,
+            shizukuRequestPending = needsShizuku && shizuku.permissionRequestPending,
+            onVerify = {
+                if (needsShizuku) container.shizukuManager.recheckPermission()
+                container.accessCoordinator.verifyPending()
+            },
             onDismiss = { container.accessCoordinator.dismiss() }
         )
     }

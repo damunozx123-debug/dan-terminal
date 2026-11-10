@@ -36,9 +36,12 @@ dependencies {
     implementation(project(":core:shizuku"))
     implementation(project(":core:bluetooth"))
     implementation(project(":feature:termux"))
+    // The app manifest declares ShizukuProvider, so lint needs this on its own classpath.
+    implementation(libs.shizuku.provider)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.navigation.compose)

@@ -37,21 +37,21 @@ fun ShizukuScreen() {
             }
         }
         Button(
-            onClick = { container.shizukuManager.requestPermission() },
-            enabled = state.binderAlive && !state.permissionGranted,
+            onClick = { container.accessCoordinator.requestShizukuPermission() },
+            enabled = !state.ready && !state.permissionRequestPending,
             modifier = Modifier.fillMaxWidth()
-        ) { Text("Request Shizuku permission") }
+        ) { Text(if (state.permissionRequestPending) "Waiting for Shizuku" else "Request Shizuku permission") }
         Button(
             onClick = { container.shizukuManager.openShizukuApp() },
             modifier = Modifier.fillMaxWidth()
         ) { Text("Open Shizuku app") }
         Button(
-            onClick = { container.shizukuManager.refresh() },
+            onClick = { container.shizukuManager.recheckPermission() },
             modifier = Modifier.fillMaxWidth()
         ) { Text("Refresh status") }
         Button(
             onClick = {
-                container.accessCoordinator.require(AccessCapability.SHIZUKU_SERVICE)
+                container.accessCoordinator.require(AccessCapability.SHIZUKU_PERMISSION)
             },
             modifier = Modifier.fillMaxWidth()
         ) { Text("Show Access Required flow") }
