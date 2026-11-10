@@ -40,7 +40,12 @@ fun HomeScreen(
             }
         )
         StatusCard("Termux", if (container.termuxBridge.isInstalled()) "Installed" else "Not installed")
-        StatusCard("Bluetooth", if (container.bleScanner.isBluetoothEnabled) "Enabled" else "Disabled")
+        StatusCard("Bluetooth", when {
+            !container.bleScanner.isLeSupported -> "BLE not supported"
+            !container.permissionBroker.isBluetoothConnectGranted() -> "Permission needed"
+            container.bleScanner.isBluetoothEnabled -> "Enabled"
+            else -> "Disabled"
+        })
 
         Button(onClick = onBluetooth, modifier = Modifier.fillMaxWidth()) {
             Text("Bluetooth / BLE / GATT")

@@ -2,13 +2,17 @@ name: Android CI
 
 on:
   push:
-    branches: [ main, 'fix/**', 'build/**', develop ]
+    branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   source-checks:
@@ -50,8 +54,19 @@ jobs:
       - name: Generate checksum-verified Gradle wrapper
         run: bash scripts/bootstrap_gradle_wrapper.sh
 
+      - name: Upload verified Gradle wrapper
+        uses: actions/upload-artifact@v4
+        with:
+          name: dan-terminal-gradle-wrapper
+          path: |
+            gradlew
+            gradlew.bat
+            gradle/wrapper/gradle-wrapper.jar
+            gradle/wrapper/gradle-wrapper.properties
+          if-no-files-found: error
+
       - name: Compile and unit test
-        run: ./gradlew :app:assembleDebug testDebugUnitTest lintDebug --stacktrace --no-daemon
+        run: ./gradlew :app:assembleDebug testDebugUnitTest lintDebug --continue --stacktrace --no-daemon
 
       - name: Upload test and lint reports
         if: always()

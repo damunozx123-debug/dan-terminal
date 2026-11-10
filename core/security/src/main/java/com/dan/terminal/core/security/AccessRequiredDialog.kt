@@ -67,7 +67,7 @@ fun AccessRequiredDialog(
                             onClick = {
                                 when (step.action) {
                                     RecoveryAction.REQUEST_RUNTIME_PERMISSION ->
-                                        permissionLauncher.launch(permissionBroker.bluetoothPermissions())
+                                        permissionLauncher.launch(permissionBroker.runtimePermissions(requirement.capability))
 
                                     RecoveryAction.REQUEST_SHIZUKU_PERMISSION ->
                                         coordinator.requestShizukuPermission()

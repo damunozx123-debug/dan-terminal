@@ -35,10 +35,11 @@ class ShizukuManager internal constructor(
                     if (active) _state.value = ShizukuState(lastError = SERVICE_STOPPED)
                 },
                 onResult = { code, granted ->
-                    if (active && code == REQUEST_CODE && _state.value.permissionRequestPending) {
+                    if (active && code == REQUEST_CODE) {
                         _state.value = _state.value.copy(permissionRequestPending = false)
                         refresh()
-                        if (!granted && _state.value.binderAlive && !_state.value.preV11) {
+                        if (!granted && !_state.value.permissionGranted &&
+                            _state.value.binderAlive && !_state.value.preV11) {
                             _state.value = _state.value.copy(
                                 permissionGranted = false,
                                 lastError = "Shizuku permission was denied. Open Shizuku to review DAN Terminal's access."

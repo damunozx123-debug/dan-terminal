@@ -10,36 +10,43 @@ data class BleDevice(
     val rssi: Int,
     val serviceUuids: List<UUID>,
     val manufacturerData: Map<Int, ByteArray>,
-    val raw: BluetoothDevice
+    val raw: BluetoothDevice,
+    val isConnectable: Boolean = true
 ) {
     val displayName: String get() = name?.takeIf { it.isNotBlank() } ?: "Unnamed device"
-    val isConnectable: Boolean get() = true
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is BleDevice) return false
-        return address == other.address && rssi == other.rssi && name == other.name
+        return address == other.address && rssi == other.rssi && name == other.name &&
+            isConnectable == other.isConnectable && serviceUuids == other.serviceUuids &&
+            manufacturerData.keys == other.manufacturerData.keys &&
+            manufacturerData.all { (key, value) -> value.contentEquals(other.manufacturerData[key]) }
     }
 
     override fun hashCode(): Int {
         var result = name?.hashCode() ?: 0
         result = 31 * result + address.hashCode()
         result = 31 * result + rssi
+        result = 31 * result + isConnectable.hashCode()
+        result = 31 * result + serviceUuids.hashCode()
+        result = 31 * result + manufacturerData.entries.sumOf { it.key.hashCode() xor it.value.contentHashCode() }
         return result
     }
 }
 
 fun ScanResult.toBleDevice(): BleDevice = BleDevice(
-    name = scanRecord?.deviceName ?: device.name,
+    name = scanRecord?.deviceName ?: try { device.name } catch (_: SecurityException) { null },
     address = device.address,
     rssi = rssi,
     serviceUuids = scanRecord?.serviceUuids?.map { it.uuid }.orEmpty(),
     manufacturerData = scanRecord?.manufacturerSpecificData?.let { data ->
         buildMap {
             for (i in 0 until data.size()) {
-                put(data.keyAt(i), data.valueAt(i))
+                put(data.keyAt(i), data.valueAt(i).copyOf())
             }
         }
     }.orEmpty(),
-    raw = device
+    raw = device,
+    isConnectable = isConnectable
 )
