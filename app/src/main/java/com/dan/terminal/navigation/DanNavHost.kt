@@ -20,6 +20,7 @@ import com.dan.terminal.feature.bluetooth.GattScreen
 import com.dan.terminal.feature.shizuku.ShizukuScreen
 import com.dan.terminal.feature.termux.TermuxScreen
 import com.dan.terminal.feature.termux.TerminalConsoleScreen
+import com.dan.terminal.feature.termux.LocalShellScreen
 import com.dan.terminal.ui.HomeScreen
 
 @Composable
@@ -28,7 +29,7 @@ fun DanNavHost() {
     val context = LocalContext.current
     val preferences = remember(context) { context.getSharedPreferences("dan_terminal_setup", 0) }
     val initialRoute = remember(preferences) {
-        if (preferences.getBoolean("setup_completed", false)) "console" else "home"
+        if (preferences.getBoolean("setup_completed", false)) "shell" else "home"
     }
     val container = LocalAppContainer.current
     val activeRequirement by container.accessCoordinator
@@ -67,7 +68,7 @@ fun DanNavHost() {
                 onTermux = { navController.navigate("termux") },
                 onConsole = {
                     preferences.edit().putBoolean("setup_completed", true).apply()
-                    navController.navigate("console") {
+                    navController.navigate("shell") {
                         popUpTo("home") { inclusive = true }
                         launchSingleTop = true
                     }
@@ -90,6 +91,12 @@ fun DanNavHost() {
         }
         composable("shizuku") { ShizukuScreen() }
         composable("termux") { TermuxScreen() }
+        composable("shell") {
+            LocalShellScreen(
+                onSettings = { navController.navigate("home") },
+                onLegacyConsole = { navController.navigate("console") }
+            )
+        }
         composable("console") {
             TerminalConsoleScreen(onBack = { navController.navigate("home") { launchSingleTop = true } })
         }
