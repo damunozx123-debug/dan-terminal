@@ -1,6 +1,7 @@
 package com.dan.terminal.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -24,6 +25,11 @@ import com.dan.terminal.ui.HomeScreen
 @Composable
 fun DanNavHost() {
     val navController = rememberNavController()
+    val context = LocalContext.current
+    val preferences = remember(context) { context.getSharedPreferences("dan_terminal_setup", 0) }
+    val initialRoute = remember(preferences) {
+        if (preferences.getBoolean("setup_completed", false)) "console" else "home"
+    }
     val container = LocalAppContainer.current
     val activeRequirement by container.accessCoordinator
         .activeRequirement
@@ -53,13 +59,19 @@ fun DanNavHost() {
         )
     }
 
-    NavHost(navController = navController, startDestination = "home") {
+    NavHost(navController = navController, startDestination = initialRoute) {
         composable("home") {
             HomeScreen(
                 onBluetooth = { navController.navigate("bluetooth") },
                 onShizuku = { navController.navigate("shizuku") },
                 onTermux = { navController.navigate("termux") },
-                onConsole = { navController.navigate("console") }
+                onConsole = {
+                    preferences.edit().putBoolean("setup_completed", true).apply()
+                    navController.navigate("console") {
+                        popUpTo("home") { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
             )
         }
         composable("bluetooth") {
@@ -79,7 +91,7 @@ fun DanNavHost() {
         composable("shizuku") { ShizukuScreen() }
         composable("termux") { TermuxScreen() }
         composable("console") {
-            TerminalConsoleScreen(onBack = { navController.popBackStack() })
+            TerminalConsoleScreen(onBack = { navController.navigate("home") { launchSingleTop = true } })
         }
     }
 }
