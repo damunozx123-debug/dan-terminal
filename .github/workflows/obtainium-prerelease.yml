@@ -1,0 +1,94 @@
+name: Publish signed DAN Terminal prerelease
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New unique version, e.g. 0.1.0-dev.1'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate release version
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]+$ ]] || {
+            echo "::error::Version must look like 0.1.0-dev.1"
+            exit 1
+          }
+          echo "TAG=v$VERSION" >> "$GITHUB_ENV"
+          echo "DAN_VERSION_NAME=$VERSION" >> "$GITHUB_ENV"
+          echo "DAN_VERSION_CODE=$((10000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Prepare Gradle wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f gradlew || ! -f gradle/wrapper/gradle-wrapper.jar ]]; then
+            gradle wrapper --gradle-version 8.10.2 --distribution-type bin
+          fi
+          chmod +x gradlew
+      - name: Restore private signing key
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.DAN_UPDATE_KEYSTORE_B64 }}
+          KEY_ALIAS: ${{ secrets.DAN_UPDATE_KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.DAN_UPDATE_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.DAN_UPDATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for value in "$KEYSTORE_B64" "$KEY_ALIAS" "$STORE_PASSWORD" "$KEY_PASSWORD"; do
+            if [[ -z "$value" ]]; then
+              echo "::error::All four DAN_UPDATE repository secrets are required"
+              exit 1
+            fi
+          done
+          umask 077
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/dan-update.jks"
+          test -s "$RUNNER_TEMP/dan-update.jks"
+      - name: Test, lint, and build signed APK
+        env:
+          DAN_UPDATE_KEYSTORE: ${{ runner.temp }}/dan-update.jks
+          DAN_UPDATE_KEY_ALIAS: ${{ secrets.DAN_UPDATE_KEY_ALIAS }}
+          DAN_UPDATE_STORE_PASSWORD: ${{ secrets.DAN_UPDATE_STORE_PASSWORD }}
+          DAN_UPDATE_KEY_PASSWORD: ${{ secrets.DAN_UPDATE_KEY_PASSWORD }}
+        run: ./gradlew testDebugUnitTest :app:lintDebug :app:assembleDebug --stacktrace
+      - name: Verify APK signing certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)
+          test -n "$APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+      - name: Prepare Obtainium assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp app/build/outputs/apk/debug/app-debug.apk dan-terminal-dev.apk
+          sha256sum dan-terminal-dev.apk > SHA256SUMS.txt
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" dan-terminal-dev.apk SHA256SUMS.txt \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "DAN Terminal $TAG (development)" \
+            --notes "Development APK signed with the persistent Munoz Tech Labs signing key. First install over a differently signed APK requires uninstalling the old build."
