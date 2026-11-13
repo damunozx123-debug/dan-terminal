@@ -54,7 +54,12 @@ fun ShizukuScreen() {
             onClick = {
                 container.shizukuManager.recheckPermission()
                 val updated = container.shizukuManager.state.value
-                feedback = if (updated.ready) "Refresh complete: Shizuku service and permission are ready." else "Refresh complete: Shizuku is not ready. ${updated.lastError ?: \"Check Shizuku service and permissions.\"}"
+                feedback = if (updated.ready) {
+                    "Refresh complete: Shizuku service and permission are ready."
+                } else {
+                    "Refresh complete: Shizuku is not ready. " +
+                        (updated.lastError ?: "Check Shizuku service and permissions.")
+                }
             },
             modifier = Modifier.fillMaxWidth()
         ) { Text("Refresh status") }
