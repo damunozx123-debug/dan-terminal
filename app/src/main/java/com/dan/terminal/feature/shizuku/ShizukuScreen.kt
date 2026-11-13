@@ -12,6 +12,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.dan.terminal.core.security.AccessCapability
@@ -21,6 +24,7 @@ import com.dan.terminal.di.LocalAppContainer
 fun ShizukuScreen() {
     val container = LocalAppContainer.current
     val state by container.shizukuManager.state.collectAsState()
+    var feedback by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -34,6 +38,7 @@ fun ShizukuScreen() {
                 Text("Version: ${state.version}")
                 Text("Pre-v11: ${state.preV11}")
                 state.lastError?.let { Text("Last error: $it") }
+                Text(if (state.ready) "Shizuku API access ready. Privileged command execution has not been tested." else "Shizuku API access not ready.")
             }
         }
         Button(
@@ -46,14 +51,20 @@ fun ShizukuScreen() {
             modifier = Modifier.fillMaxWidth()
         ) { Text("Open Shizuku app") }
         Button(
-            onClick = { container.shizukuManager.recheckPermission() },
+            onClick = {
+                container.shizukuManager.recheckPermission()
+                val updated = container.shizukuManager.state.value
+                feedback = if (updated.ready) "Refresh complete: Shizuku service and permission are ready." else "Refresh complete: Shizuku is not ready. ${updated.lastError ?: \"Check Shizuku service and permissions.\"}"
+            },
             modifier = Modifier.fillMaxWidth()
         ) { Text("Refresh status") }
         Button(
             onClick = {
-                container.accessCoordinator.require(AccessCapability.SHIZUKU_PERMISSION)
+                val allowed = container.accessCoordinator.require(AccessCapability.SHIZUKU_PERMISSION)
+                feedback = if (allowed) "Access already granted. No permission prompt is necessary." else "Access required. Check the permission flow or open Shizuku."
             },
             modifier = Modifier.fillMaxWidth()
-        ) { Text("Show Access Required flow") }
+        ) { Text("Check access requirement") }
+        feedback?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
     }
 }
