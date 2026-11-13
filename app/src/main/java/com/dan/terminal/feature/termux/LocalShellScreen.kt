@@ -7,6 +7,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -14,15 +15,15 @@ import androidx.compose.ui.unit.dp
 
 /**
  * Persistent command shell prototype, NOT yet a PTY/ANSI terminal emulator.
- * Keeps one session across navigation recompositions while this screen is alive.
+ * Session survives screen recomposition and navigation while its ViewModel is retained.
  */
 @Composable
-fun LocalShellScreen(onSettings: () -> Unit, onLegacyConsole: () -> Unit) {
-    val session = remember { LocalShellSession() }
-    DisposableEffect(session) {
-        session.start()
-        onDispose { session.dispose() }
-    }
+fun LocalShellScreen(
+    onSettings: () -> Unit,
+    onLegacyConsole: () -> Unit,
+    shellModel: LocalShellViewModel = viewModel()
+) {
+    val session = shellModel.session
     val output by session.output.collectAsState()
     val running by session.running.collectAsState()
     var command by remember { mutableStateOf("") }
