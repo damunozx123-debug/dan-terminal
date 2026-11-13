@@ -88,10 +88,12 @@ fun TerminalConsoleScreen(onBack: () -> Unit) {
                                         entry.stderr,
                                         color = MaterialTheme.colorScheme.error
                                     )
-                                    if (entry.error != null) Text(
-                                        entry.error,
-                                        color = MaterialTheme.colorScheme.error
-                                    )
+                                    entry.error?.let { errorMessage ->
+                                        Text(
+                                            errorMessage,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    }
                                     Text("Exit code: " + (entry.exitCode ?: "?"))
                                 }
                             }
