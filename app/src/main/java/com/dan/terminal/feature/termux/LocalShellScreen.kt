@@ -8,6 +8,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -21,9 +23,11 @@ import androidx.compose.ui.unit.dp
 fun LocalShellScreen(
     onSettings: () -> Unit,
     onLegacyConsole: () -> Unit,
-    shellModel: LocalShellViewModel = viewModel()
+    shellModel: LocalShellViewModel? = null
 ) {
-    val session = shellModel.session
+    val activity = LocalContext.current as ComponentActivity
+    val retainedModel: LocalShellViewModel = shellModel ?: viewModel(viewModelStoreOwner = activity)
+    val session = retainedModel.session
     val output by session.output.collectAsState()
     val running by session.running.collectAsState()
     var command by remember { mutableStateOf("") }
