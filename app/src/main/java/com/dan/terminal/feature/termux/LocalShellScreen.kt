@@ -9,7 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.activity.ComponentActivity
-import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.LocalActivity
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -25,7 +25,8 @@ fun LocalShellScreen(
     onLegacyConsole: () -> Unit,
     shellModel: LocalShellViewModel? = null
 ) {
-    val activity = LocalContext.current as ComponentActivity
+    val activity = LocalActivity.current as? ComponentActivity
+        ?: error("DAN Terminal requires a ComponentActivity host")
     val retainedModel: LocalShellViewModel = shellModel ?: viewModel(viewModelStoreOwner = activity)
     val session = retainedModel.session
     val output by session.output.collectAsState()
