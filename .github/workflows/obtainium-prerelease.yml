@@ -1,0 +1,56 @@
+name: Obtainium development prerelease
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Unique prerelease version, e.g. 0.1.0-dev.1'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate version
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]+$ ]] || exit 1
+          echo "TAG=v$VERSION" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+      - name: Ensure Gradle wrapper
+        run: |
+          if [[ ! -f gradlew || ! -f gradle/wrapper/gradle-wrapper.jar ]]; then
+            gradle wrapper --gradle-version 8.14.3 --distribution-type bin
+          fi
+          chmod +x gradlew
+      - name: Build and test
+        run: |
+          ./gradlew testDebugUnitTest :app:assembleDebug --stacktrace
+      - name: Prepare artifact
+        run: |
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk dan-terminal-dev.apk
+          sha256sum dan-terminal-dev.apk > SHA256SUMS.txt
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" dan-terminal-dev.apk SHA256SUMS.txt \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "DAN Terminal $TAG (development)" \
+            --notes "Development-only APK. GitHub-hosted runners use ephemeral debug signing keys; updates may require uninstalling the prior APK and will erase app data. Not a stable auto-update channel. Do not rely on this for unattended upgrades."
