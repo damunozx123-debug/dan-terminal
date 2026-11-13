@@ -40,13 +40,15 @@ fun LocalShellScreen(onSettings: () -> Unit, onLegacyConsole: () -> Unit) {
             color = Color.LightGray,
             style = MaterialTheme.typography.labelSmall
         )
-        SelectionContainer {
-            Text(
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            SelectionContainer {
+                Text(
                 output,
-                modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll),
+                modifier = Modifier.fillMaxWidth().verticalScroll(scroll),
                 color = Color(0xFFE2E8F0),
                 fontFamily = FontFamily.Monospace
-            )
+                )
+            }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
