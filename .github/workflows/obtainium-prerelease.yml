@@ -37,9 +37,34 @@ jobs:
             gradle wrapper --gradle-version 8.14.3 --distribution-type bin
           fi
           chmod +x gradlew
-      - name: Build and test
+      - name: Require persistent signing secrets
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.DAN_UPDATE_KEYSTORE_B64 }}
+          KEY_ALIAS: ${{ secrets.DAN_UPDATE_KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.DAN_UPDATE_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.DAN_UPDATE_KEY_PASSWORD }}
         run: |
-          ./gradlew testDebugUnitTest :app:assembleDebug --stacktrace
+          for value in "$KEYSTORE_B64" "$KEY_ALIAS" "$STORE_PASSWORD" "$KEY_PASSWORD"; do
+            if [[ -z "$value" ]]; then
+              echo "::error::Missing signing secret; refusing ephemeral APK signing"
+              exit 1
+            fi
+          done
+          umask 077
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/dan-update.jks"
+          test -s "$RUNNER_TEMP/dan-update.jks"
+          echo "DAN_UPDATE_KEYSTORE=$RUNNER_TEMP/dan-update.jks" >> "$GITHUB_ENV"
+          echo "DAN_VERSION_CODE=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+          echo "DAN_VERSION_NAME=${{ inputs.version }}" >> "$GITHUB_ENV"
+          echo "DAN_UPDATE_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "DAN_UPDATE_STORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "DAN_UPDATE_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+      - name: Build and test with persistent signing
+        run: ./gradlew testDebugUnitTest :app:assembleDebug --stacktrace
+      - name: Verify APK signing
+        run: |
+          "${ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
       - name: Prepare artifact
         run: |
           test -s app/build/outputs/apk/debug/app-debug.apk
@@ -53,4 +78,4 @@ jobs:
             --target "$GITHUB_SHA" \
             --prerelease \
             --title "DAN Terminal $TAG (development)" \
-            --notes "Development-only APK. GitHub-hosted runners use ephemeral debug signing keys; updates may require uninstalling the prior APK and will erase app data. Not a stable auto-update channel. Do not rely on this for unattended upgrades."
+            --notes "Development APK signed using the persistent DAN_UPDATE key. Same package ID and certificate required for updates."
