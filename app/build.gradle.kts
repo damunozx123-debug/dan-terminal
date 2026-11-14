@@ -34,6 +34,9 @@ android {
     }
     buildTypes {
         getByName("debug") {
+            // Separate development install. Never replace or erase the existing app.
+            // Kotlin namespace / class names remain com.dan.terminal.
+            applicationIdSuffix = ".dev"
             if (updateSigningEnabled) signingConfig = signingConfigs.getByName("obtainium")
         }
         release {
