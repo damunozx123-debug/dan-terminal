@@ -27,14 +27,14 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.14.3'
+          gradle-version: '8.13'
       - name: Ensure Gradle wrapper
         run: |
           if [[ ! -f gradlew || ! -f gradle/wrapper/gradle-wrapper.jar ]]; then
-            gradle wrapper --gradle-version 8.14.3 --distribution-type bin
+            gradle wrapper --gradle-version 8.13 --distribution-type bin
           fi
           chmod +x gradlew
       - name: Require persistent signing secrets
@@ -62,9 +62,20 @@ jobs:
           echo "DAN_UPDATE_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
       - name: Build and test with persistent signing
         run: ./gradlew testDebugUnitTest :app:assembleDebug --stacktrace
-      - name: Verify APK signing
+      - name: Verify APK signing and development identity
+        shell: bash
         run: |
-          "${ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print -quit)"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt -print -quit)"
+          test -x "$APKSIGNER"
+          test -x "$AAPT"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+          "$AAPT" dump badging "$APK" > "$RUNNER_TEMP/dan-dev-badging.txt"
+          grep -Fq "package: name='com.dan.terminal.dev' " "$RUNNER_TEMP/dan-dev-badging.txt"
+          grep -Fq "application-label:'DAN Terminal Dev'" "$RUNNER_TEMP/dan-dev-badging.txt"
       - name: Prepare artifact
         run: |
           test -s app/build/outputs/apk/debug/app-debug.apk
@@ -78,4 +89,4 @@ jobs:
             --target "$GITHUB_SHA" \
             --prerelease \
             --title "DAN Terminal $TAG (development)" \
-            --notes "Development APK signed using the persistent DAN_UPDATE key. Same package ID and certificate required for updates."
+            --notes "Development APK signed using the persistent DAN_UPDATE key. Updates of the separate com.dan.terminal.dev app require the same certificate. The existing com.dan.terminal app is not replaced."
