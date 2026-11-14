@@ -50,6 +50,9 @@ Termux execution on the phone has been observed in this work session.
 
 ## Remaining scope
 
-There is no embedded terminal/PTY or bundled Shizuku service yet. Distribution
-profiles, SSH/Mosh screens, graphics protocols and GATT read/write/notify UI
-remain roadmap work. Existing partial requirement statuses remain partial.
+An M3.1 app-owned PTY service and terminal-view integration have been added on
+the feature branch. The Android instrumented PTY acceptance test has not yet
+run; compilation, emulator execution, and Redmi/HyperOS testing are pending.
+Distribution profiles, SSH/Mosh screens, graphics protocols, and GATT
+read/write/notify UI remain roadmap work. Existing partial requirement statuses
+remain partial.

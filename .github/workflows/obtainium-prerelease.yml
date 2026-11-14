@@ -1,0 +1,92 @@
+name: Obtainium development prerelease
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Unique prerelease version, e.g. 0.1.0-dev.1'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate version
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]+$ ]] || exit 1
+          echo "TAG=v$VERSION" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Ensure Gradle wrapper
+        run: |
+          if [[ ! -f gradlew || ! -f gradle/wrapper/gradle-wrapper.jar ]]; then
+            gradle wrapper --gradle-version 8.13 --distribution-type bin
+          fi
+          chmod +x gradlew
+      - name: Require persistent signing secrets
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.DAN_UPDATE_KEYSTORE_B64 }}
+          KEY_ALIAS: ${{ secrets.DAN_UPDATE_KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.DAN_UPDATE_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.DAN_UPDATE_KEY_PASSWORD }}
+        run: |
+          for value in "$KEYSTORE_B64" "$KEY_ALIAS" "$STORE_PASSWORD" "$KEY_PASSWORD"; do
+            if [[ -z "$value" ]]; then
+              echo "::error::Missing signing secret; refusing ephemeral APK signing"
+              exit 1
+            fi
+          done
+          umask 077
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/dan-update.jks"
+          test -s "$RUNNER_TEMP/dan-update.jks"
+          echo "DAN_UPDATE_KEYSTORE=$RUNNER_TEMP/dan-update.jks" >> "$GITHUB_ENV"
+          echo "DAN_VERSION_CODE=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+          echo "DAN_VERSION_NAME=${{ inputs.version }}" >> "$GITHUB_ENV"
+          echo "DAN_UPDATE_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "DAN_UPDATE_STORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "DAN_UPDATE_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+      - name: Build and test with persistent signing
+        run: ./gradlew testDebugUnitTest :app:assembleDebug --stacktrace
+      - name: Verify APK signing and development identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print -quit)"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt -print -quit)"
+          test -x "$APKSIGNER"
+          test -x "$AAPT"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+          "$AAPT" dump badging "$APK" > "$RUNNER_TEMP/dan-dev-badging.txt"
+          grep -Fq "package: name='com.dan.terminal.dev' " "$RUNNER_TEMP/dan-dev-badging.txt"
+          grep -Fq "application-label:'DAN Terminal Dev'" "$RUNNER_TEMP/dan-dev-badging.txt"
+      - name: Prepare artifact
+        run: |
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk dan-terminal-dev.apk
+          sha256sum dan-terminal-dev.apk > SHA256SUMS.txt
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" dan-terminal-dev.apk SHA256SUMS.txt \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "DAN Terminal $TAG (development)" \
+            --notes "Development APK signed using the persistent DAN_UPDATE key. Updates of the separate com.dan.terminal.dev app require the same certificate. The existing com.dan.terminal app is not replaced."

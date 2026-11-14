@@ -1,8 +1,8 @@
 # DAN Terminal
 
-Android companion app for native BLE discovery, GATT service browsing,
-Shizuku access recovery, and a Termux toolchain bootstrap. This is an early
-M0/M1 build, not the full terminal described in the feature roadmap.
+Android app with BLE/GATT tools, Shizuku access recovery, Termux integration,
+and an M3.1 PTY terminal prototype. The PTY source and acceptance test are in
+progress; emulator and Redmi verification are pending.
 
 [Source and review](https://github.com/damunozx123-debug/dan-terminal/pull/1) ·
 [Android builds and APK downloads](https://github.com/damunozx123-debug/dan-terminal/actions/workflows/android.yml)
@@ -10,7 +10,9 @@ M0/M1 build, not the full terminal described in the feature roadmap.
 ## Try the app
 
 1. Open a successful **Android CI** run for the desired commit.
-2. Download **dan-terminal-debug**, extract the ZIP, and install `app-debug.apk`.
+2. Download **dan-terminal-dev-debug**, extract the ZIP, and install `app-debug.apk`.
+   It installs as **DAN Terminal Dev** (`com.dan.terminal.dev`) alongside the
+   existing **DAN Terminal** (`com.dan.terminal`). Do **not** uninstall the existing app.
 3. Open **Bluetooth / BLE / GATT**, grant the requested access and start a scan.
    Tap a connectable device, then **Connect** to browse its services.
 4. For Shizuku access, use the official Shizuku app to pair/start its service,
@@ -19,9 +21,15 @@ M0/M1 build, not the full terminal described in the feature roadmap.
    **Run commands in Termux environment**, and enable `allow-external-apps=true`
    in Termux's properties. Run the bootstrap and check its output in Termux.
 
-This is a debug APK for testing. Physical Redmi/HyperOS testing remains required.
-The CI debug signing key can change between runners, so a later debug APK may
-require uninstalling the previous build (which deletes that app's local data).
+This development APK is a **separate Android application**, with separate app data,
+permissions, Shizuku authorization, and terminal files. The source Kotlin namespace
+remains `com.dan.terminal` but the debug APK application ID is `com.dan.terminal.dev`.
+
+Physical Redmi/HyperOS testing remains required. Android CI debug signing
+certificates may change between machines. If a later Dev APK has a different
+signature, do not uninstall the **original** DAN Terminal; only the Dev app
+could need replacement, and uninstalling it deletes its own local data.
+A consistently signed Dev prerelease is the proper path to in-place Dev updates.
 
 ## Included
 
@@ -32,12 +40,16 @@ require uninstalling the previous build (which deletes that app's local data).
 - Official Shizuku API integration with service-death, denial, legacy-service,
   duplicate-request and delayed-result handling.
 - Repeatable Termux bootstrap that reports package failures accurately.
+- A service-owned `/system/bin/sh` PTY session rendered by Termux's terminal
+  libraries. Session I/O, resize and Ctrl+C acceptance test is added but has
+  not yet run; Android may end the service if it kills the app process.
 
 ## Not implemented yet
 
-Embedded terminal/PTY, bundled Shizuku service, Linux distribution profiles,
-SSH/Mosh UI, graphics protocols, and GATT write/notify controls are still roadmap
-work. Termux and Shizuku remain external apps. There is no automatic root access.
+Tabs, restore after Android process death, a foreground-service guarantee,
+Linux distribution profiles, SSH/Mosh UI, graphics protocols, and GATT
+write/notify controls remain roadmap work. Termux and Shizuku remain external
+apps. There is no automatic root access.
 See [the requirement tracker](docs/REQUIREMENT_TRACKER.md) for all 95 requirements.
 
 ## Build and verification
@@ -49,12 +61,13 @@ The committed Gradle wrapper verifies its distribution checksum.
 ```sh
 python3 scripts/validate_source_tree.py
 python3 scripts/test_bootstrap.py
-./gradlew :app:assembleDebug testDebugUnitTest lintDebug --continue --stacktrace
+./gradlew :app:assembleDebug testDebugUnitTest lintDebug :app:connectedDebugAndroidTest --continue --stacktrace
 ```
 
 CI runs these checks and uploads the APK only after assembly, unit tests and lint
-succeed. Reports remain available when a build fails. The APK is at
-`app/build/outputs/apk/debug/app-debug.apk` when building locally.
+succeed. Reports remain available when a build fails. The debug APK is at
+`app/build/outputs/apk/debug/app-debug.apk` when building locally, and must
+identify itself as `com.dan.terminal.dev` when inspected with `aapt dump badging`.
 
 See [current implementation status](docs/IMPLEMENTATION_STATUS.md) and the
 [Shizuku review](docs/SHIZUKU_REVIEW.md). The original

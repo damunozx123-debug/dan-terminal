@@ -1,0 +1,4 @@
+<resources>
+    <!-- Label debug installs clearly so they are distinct from existing M1 apps. -->
+    <string name="app_name">DAN Terminal Dev</string>
+</resources>

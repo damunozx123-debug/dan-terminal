@@ -20,7 +20,8 @@ import com.dan.terminal.di.LocalAppContainer
 fun HomeScreen(
     onBluetooth: () -> Unit,
     onShizuku: () -> Unit,
-    onTermux: () -> Unit
+    onTermux: () -> Unit,
+    onConsole: () -> Unit
 ) {
     val container = LocalAppContainer.current
     val shizuku by container.shizukuManager.state.collectAsState()
@@ -47,6 +48,9 @@ fun HomeScreen(
             else -> "Disabled"
         })
 
+        Button(onClick = onConsole, modifier = Modifier.fillMaxWidth()) {
+            Text("Open terminal console")
+        }
         Button(onClick = onBluetooth, modifier = Modifier.fillMaxWidth()) {
             Text("Bluetooth / BLE / GATT")
         }
