@@ -1,8 +1,8 @@
 # DAN Terminal
 
-Android companion app for native BLE discovery, GATT service browsing,
-Shizuku access recovery, and a Termux toolchain bootstrap. This is an early
-M0/M1 build, not the full terminal described in the feature roadmap.
+Android app with BLE/GATT tools, Shizuku access recovery, Termux integration,
+and an M3.1 PTY terminal prototype. The PTY source and acceptance test are in
+progress; emulator and Redmi verification are pending.
 
 [Source and review](https://github.com/damunozx123-debug/dan-terminal/pull/1) ·
 [Android builds and APK downloads](https://github.com/damunozx123-debug/dan-terminal/actions/workflows/android.yml)
@@ -32,12 +32,16 @@ require uninstalling the previous build (which deletes that app's local data).
 - Official Shizuku API integration with service-death, denial, legacy-service,
   duplicate-request and delayed-result handling.
 - Repeatable Termux bootstrap that reports package failures accurately.
+- A service-owned `/system/bin/sh` PTY session rendered by Termux's terminal
+  libraries. Session I/O, resize and Ctrl+C acceptance test is added but has
+  not yet run; Android may end the service if it kills the app process.
 
 ## Not implemented yet
 
-Embedded terminal/PTY, bundled Shizuku service, Linux distribution profiles,
-SSH/Mosh UI, graphics protocols, and GATT write/notify controls are still roadmap
-work. Termux and Shizuku remain external apps. There is no automatic root access.
+Tabs, restore after Android process death, a foreground-service guarantee,
+Linux distribution profiles, SSH/Mosh UI, graphics protocols, and GATT
+write/notify controls remain roadmap work. Termux and Shizuku remain external
+apps. There is no automatic root access.
 See [the requirement tracker](docs/REQUIREMENT_TRACKER.md) for all 95 requirements.
 
 ## Build and verification
@@ -49,7 +53,7 @@ The committed Gradle wrapper verifies its distribution checksum.
 ```sh
 python3 scripts/validate_source_tree.py
 python3 scripts/test_bootstrap.py
-./gradlew :app:assembleDebug testDebugUnitTest lintDebug --continue --stacktrace
+./gradlew :app:assembleDebug testDebugUnitTest lintDebug :app:connectedDebugAndroidTest --continue --stacktrace
 ```
 
 CI runs these checks and uploads the APK only after assembly, unit tests and lint

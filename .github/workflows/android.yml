@@ -70,6 +70,24 @@ jobs:
       - name: Compile and unit test
         run: ./gradlew :app:assembleDebug testDebugUnitTest lintDebug --continue --stacktrace --no-daemon
 
+      - name: Run PTY acceptance test on Android 16 emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: ./gradlew :app:connectedDebugAndroidTest --stacktrace
+
+      - name: Upload instrumented test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dan-terminal-instrumented-test-reports
+          path: app/build/reports/androidTests/connected/
+          if-no-files-found: warn
+
       - name: Upload test and lint reports
         if: always()
         uses: actions/upload-artifact@v4

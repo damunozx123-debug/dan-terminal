@@ -43,6 +43,10 @@
             </intent-filter>
         </activity>
 
+        <service
+            android:name=".feature.termux.PtyTerminalService"
+            android:exported="false" />
+
         <receiver
             android:name="com.dan.terminal.feature.termux.TermuxCommandResultReceiver"
             android:exported="false" />

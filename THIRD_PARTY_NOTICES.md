@@ -15,6 +15,19 @@ This source distribution does not bundle the Shizuku manager/service APK.
 Any future service embedding requires a separate dependency, licensing and
 security review; permission to use the API is not a review of that proposal.
 
+## Termux terminal view and emulator
+
+The app uses `com.termux.termux-app:terminal-view:0.118.0` and its transitive
+`terminal-emulator` library for terminal rendering and PTY creation. The upstream
+Termux repository identifies the terminal-view and terminal-emulator code as
+Apache License 2.0 exceptions; this does not incorporate the GPLv3-only Termux
+application or `termux-shared` library. The full Apache License 2.0 text is
+retained at `licenses/Apache-2.0.txt`.
+
+Upstream source and library guidance:
+https://github.com/termux/termux-app/tree/v0.118.0/terminal-view
+https://github.com/termux/termux-app/tree/v0.118.0/terminal-emulator
+
 ## Remaining dependency audit
 
 AndroidX/Compose, Kotlin, coroutines, test libraries, build tools and their

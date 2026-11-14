@@ -11,6 +11,8 @@ shizuku = "13.1.5"
 junit = "4.13.2"
 androidxJunit = "1.2.1"
 espresso = "3.6.1"
+androidxTestRules = "1.6.1"
+termuxTerminal = "0.118.0"
 mockito = "5.15.2"
 
 [libraries]
@@ -33,6 +35,8 @@ shizuku-provider = { group = "dev.rikka.shizuku", name = "provider", version.ref
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }
+androidx-test-rules = { group = "androidx.test", name = "rules", version.ref = "androidxTestRules" }
+termux-terminal-view = { group = "com.termux.termux-app", name = "terminal-view", version.ref = "termuxTerminal" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
 
