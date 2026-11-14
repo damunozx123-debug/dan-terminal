@@ -43,6 +43,24 @@ jobs:
       - name: Assemble debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
 
+      - name: Verify launchable activity in packaged APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          test -d "$SDK/build-tools"
+          AAPT="$(find "$SDK/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -x "$AAPT"
+          BADGING="$("$AAPT" dump badging "$APK")"
+          LAUNCHER="$(printf '%s\n' "$BADGING" | grep '^launchable-activity:' || true)"
+          echo "APK launcher declaration: $LAUNCHER"
+          [[ "$LAUNCHER" == *"name='com.dan.terminal.MainActivity'"* ]] || {
+            echo "::error::APK does not expose DAN Terminal's MAIN/LAUNCHER activity"
+            exit 1
+          }
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
