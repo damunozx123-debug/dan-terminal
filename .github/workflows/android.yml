@@ -30,7 +30,8 @@ jobs:
         run: git diff --check
 
   build:
-    runs-on: ubuntu-latest
+    # Linux runner has no /dev/kvm; run Android emulator acceptance on accelerated macOS.
+    runs-on: macos-15-intel
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
