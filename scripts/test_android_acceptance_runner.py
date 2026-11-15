@@ -1,4 +1,4 @@
-"""Verify emulator startup failures stay distinct from instrumented test failures."""
+"""Exercise acceptance/retry decisions with isolated ADB/Gradle fixtures."""
 import os
 from pathlib import Path
 import subprocess
@@ -6,42 +6,163 @@ import tempfile
 import unittest
 
 RUNNER = Path(__file__).with_name("run_android_acceptance.sh").resolve()
+SUCCESS = """<testsuite tests="2" failures="0" errors="0" skipped="0">
+<testcase classname="com.dan.AcceptanceTest" name="shellPersists"/>
+<testcase classname="com.dan.AcceptanceTest" name="wrapsAt80Columns"/>
+</testsuite>"""
+INSTALL_FAILURE = "Unknown failure: cmd: Can't find service: package"
 
 
 class AcceptanceRunnerTest(unittest.TestCase):
-    def run_fixture(self, boot_ready="1", test_exit="0", transient_adb="0"):
+    def run_fixture(self, *, boot_ready="1", test_exit=0, transient_adb="0",
+                    report=SUCCESS, output="", stale_report=None):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             bin_dir = root / "bin"
             bin_dir.mkdir()
+            source = root / "app/src/androidTest/java/com/dan/AcceptanceTest.kt"
+            source.parent.mkdir(parents=True)
+            source.write_text("""package com.dan
+class AcceptanceTest {
+    @Test fun shellPersists() {}
+    @Test
+    fun wrapsAt80Columns() {}
+}
+""")
+            results = root / "app/build/outputs/androidTest-results/connected"
+            if stale_report:
+                results.mkdir(parents=True)
+                (results / "stale.xml").write_text(stale_report)
             (bin_dir / "adb").write_text("""#!/usr/bin/env bash
 if [[ "$*" == 'shell getprop sys.boot_completed' ]]; then
   if [[ "$TRANSIENT_ADB" == 1 && ! -f adb-retried ]]; then touch adb-retried; exit 1; fi
-  echo "$BOOT_READY";
-elif [[ "$*" == 'shell pm path android' ]]; then echo 'package:/system/framework/framework-res.apk';
+  echo "$BOOT_READY"
+elif [[ "$*" == 'shell pm path android' ]]; then echo 'package:/system/framework/framework-res.apk'
 else echo 'fixture diagnostics'; fi
 """)
             (bin_dir / "sleep").write_text("#!/usr/bin/env bash\nexit 0\n")
-            (root / "gradlew").write_text("#!/usr/bin/env bash\ntouch gradle-called\nexit \"$TEST_EXIT\"\n")
+            (root / "gradlew").write_text("""#!/usr/bin/env python3
+import os
+from pathlib import Path
+Path('gradle-called').touch()
+report = os.environ['TEST_REPORT']
+if report:
+    target = Path('app/build/outputs/androidTest-results/connected/fixture/TEST-results.xml')
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(report)
+print(os.environ['TEST_OUTPUT'])
+raise SystemExit(int(os.environ['TEST_EXIT']))
+""")
             for file in [bin_dir / "adb", bin_dir / "sleep", root / "gradlew"]:
                 file.chmod(0o755)
             env = dict(os.environ, PATH=f"{bin_dir}:{os.environ['PATH']}",
-                       RUNNER_TEMP=str(root), BOOT_READY=boot_ready, TEST_EXIT=test_exit, TRANSIENT_ADB=transient_adb)
-            result = subprocess.run(["bash", str(RUNNER)], cwd=root, env=env, capture_output=True)
+                       RUNNER_TEMP=str(root), BOOT_READY=boot_ready,
+                       TEST_EXIT=str(test_exit), TRANSIENT_ADB=transient_adb,
+                       TEST_REPORT=report or "", TEST_OUTPUT=output,
+                       DAN_ACCEPTANCE_ATTEMPT="first")
+            result = subprocess.run(["bash", str(RUNNER)], cwd=root, env=env,
+                                    capture_output=True, text=True, timeout=20)
             diag = root / "dan-terminal-emulator-diagnostics"
-            return result.returncode, (diag / "tests-started").exists(), (root / "gradle-called").exists(), (diag / "logcat.txt").exists()
+            return {
+                "exit": result.returncode,
+                "started": bool(list(diag.rglob("tests-started"))),
+                "retry": bool(list(diag.rglob("retryable-infrastructure"))),
+                "gradle": (root / "gradle-called").exists(),
+                "diagnostics": bool(list(diag.rglob("logcat.txt"))),
+                "output": result.stdout + result.stderr,
+            }
 
-    def test_ready_emulator_runs_tests_and_captures_diagnostics(self):
-        self.assertEqual((0, True, True, True), self.run_fixture())
+    def test_ready_emulator_requires_the_complete_passing_suite(self):
+        actual = self.run_fixture()
+        self.assertEqual(0, actual["exit"], actual["output"])
+        self.assertTrue(actual["started"])
+        self.assertFalse(actual["retry"])
+        self.assertTrue(actual["gradle"])
+        self.assertTrue(actual["diagnostics"])
 
-    def test_boot_timeout_never_starts_instrumentation(self):
-        self.assertEqual((1, False, False, True), self.run_fixture(boot_ready="0"))
+    def test_boot_timeout_allows_startup_retry_without_invoking_gradle(self):
+        actual = self.run_fixture(boot_ready="0")
+        self.assertNotEqual(0, actual["exit"])
+        self.assertFalse(actual["started"])
+        self.assertFalse(actual["gradle"])
+        self.assertTrue(actual["retry"])
+        self.assertTrue(actual["diagnostics"])
 
-    def test_test_failure_keeps_exit_code_and_prevents_boot_retry(self):
-        self.assertEqual((7, True, True, True), self.run_fixture(test_exit="7"))
+    def test_package_service_loss_after_readiness_is_retryable(self):
+        actual = self.run_fixture(test_exit=1, report='<testsuite tests="0"/>',
+                                  output=INSTALL_FAILURE)
+        self.assertEqual(1, actual["exit"])
+        self.assertTrue(actual["gradle"])
+        self.assertFalse(actual["started"])
+        self.assertTrue(actual["retry"])
+
+    def test_real_assertion_failure_preserves_exit_code_without_retry(self):
+        report = SUCCESS.replace('name="shellPersists"/>',
+                                 'name="shellPersists"><failure message="bad output"/></testcase>')
+        actual = self.run_fixture(test_exit=7, report=report)
+        self.assertEqual(7, actual["exit"])
+        self.assertTrue(actual["started"])
+        self.assertFalse(actual["retry"])
+
+    def test_assertion_failure_cannot_be_hidden_by_package_service_error(self):
+        report = '<testsuite tests="1"><testcase classname="com.dan.AcceptanceTest" name="shellPersists"><failure/></testcase></testsuite>'
+        actual = self.run_fixture(test_exit=1, report=report, output=INSTALL_FAILURE)
+        self.assertNotEqual(0, actual["exit"])
+        self.assertFalse(actual["retry"])
+
+    def test_instrumentation_crash_before_first_test_is_not_retryable(self):
+        actual = self.run_fixture(test_exit=1, report=None,
+                                  output=INSTALL_FAILURE + "\nINSTRUMENTATION_RESULT: shortMsg=Process crashed.")
+        self.assertNotEqual(0, actual["exit"])
+        self.assertFalse(actual["retry"])
+
+    def test_zero_tests_cannot_pass_even_when_gradle_succeeds(self):
+        actual = self.run_fixture(report='<testsuite tests="0"/>')
+        self.assertNotEqual(0, actual["exit"])
+        self.assertFalse(actual["started"])
+        self.assertFalse(actual["retry"])
+
+    def test_partial_suite_cannot_pass(self):
+        report = '<testsuite tests="1"><testcase classname="com.dan.AcceptanceTest" name="shellPersists"/></testsuite>'
+        actual = self.run_fixture(report=report)
+        self.assertNotEqual(0, actual["exit"])
+        self.assertFalse(actual["retry"])
+
+    def test_skipped_test_cannot_pass(self):
+        report = SUCCESS.replace('name="shellPersists"/>',
+                                 'name="shellPersists"><skipped/></testcase>')
+        self.assertNotEqual(0, self.run_fixture(report=report)["exit"])
+
+    def test_failure_element_cannot_pass_when_gradle_returns_zero(self):
+        report = SUCCESS.replace('name="shellPersists"/>',
+                                 'name="shellPersists"><failure/></testcase>')
+        self.assertNotEqual(0, self.run_fixture(report=report)["exit"])
+
+    def test_suite_error_counter_cannot_pass_without_an_error_element(self):
+        report = SUCCESS.replace('errors="0"', 'errors="1"')
+        self.assertNotEqual(0, self.run_fixture(report=report)["exit"])
+
+    def test_unreported_gradle_failure_is_not_retried(self):
+        actual = self.run_fixture(test_exit=9, report=None, output="dependency resolution failed")
+        self.assertEqual(9, actual["exit"])
+        self.assertFalse(actual["started"])
+        self.assertFalse(actual["retry"])
+
+    def test_stale_passing_report_cannot_validate_an_empty_attempt(self):
+        actual = self.run_fixture(report=None, stale_report=SUCCESS)
+        self.assertNotEqual(0, actual["exit"])
+        self.assertFalse(actual["started"])
+
+    def test_corrupt_report_is_neither_accepted_nor_retried(self):
+        actual = self.run_fixture(test_exit=1, report='<testsuite', output=INSTALL_FAILURE)
+        self.assertNotEqual(0, actual["exit"])
+        self.assertFalse(actual["retry"])
 
     def test_transient_adb_failure_is_retried_in_readiness_loop(self):
-        self.assertEqual((0, True, True, True), self.run_fixture(transient_adb="1"))
+        actual = self.run_fixture(transient_adb="1")
+        self.assertEqual(0, actual["exit"], actual["output"])
+        self.assertTrue(actual["started"])
+        self.assertTrue(actual["gradle"])
 
 
 if __name__ == "__main__":

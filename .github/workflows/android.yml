@@ -92,6 +92,8 @@ jobs:
         id: acceptance
         continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          DAN_ACCEPTANCE_ATTEMPT: first
         with:
           api-level: 36
           target: google_apis
@@ -107,12 +109,13 @@ jobs:
         if: steps.acceptance.outcome == 'failure'
         shell: bash
         run: |
-          if [[ -f "$RUNNER_TEMP/dan-terminal-emulator-diagnostics/tests-started" ]]; then
-            echo "retry=false" >> "$GITHUB_OUTPUT"
-            echo "Instrumentation started; preserving test failure."
-          else
+          DIAG="$RUNNER_TEMP/dan-terminal-emulator-diagnostics/first"
+          if [[ ! -f "$DIAG/runner-entered" || -f "$DIAG/retryable-infrastructure" ]]; then
             echo "retry=true" >> "$GITHUB_OUTPUT"
-            echo "Instrumentation never started; retrying a fresh emulator once."
+            echo "Known emulator startup/install failure; retrying a fresh emulator once."
+          else
+            echo "retry=false" >> "$GITHUB_OUTPUT"
+            echo "Preserving test/crash or unclassified failure without retry."
           fi
 
       - name: Retry emulator startup once
@@ -120,6 +123,8 @@ jobs:
         if: steps.boot_failure.outputs.retry == 'true'
         continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          DAN_ACCEPTANCE_ATTEMPT: retry
         with:
           api-level: 36
           target: google_apis

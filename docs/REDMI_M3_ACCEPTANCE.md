@@ -4,6 +4,21 @@ Device: Redmi Note 14 Pro+ Global / HyperOS 3.0
 Tester: Dan
 APK/build: record the exact artifact URL, version and SHA-256 before testing.
 
+Device reference supplied by Dan on 16 November 2026 (Settings screenshot;
+capture date unknown, so reconfirm before acceptance):
+
+| Field | Screenshot value |
+|---|---|
+| Model | 24115RA8EG |
+| RAM / storage | 12.0 GB / 256 GB |
+| HyperOS | 3.0.304.0.WOPMIXM.C07 |
+| Android / build | 16 / BP2A.250605.031.A3 |
+| Android security update | 2026-06-01 |
+| Kernel | 6.1.138-android14-11-g0c3d559bcd85-ab14529422 |
+
+This screenshot identifies software/device details only. It does not prove an
+APK install, terminal behavior, bootloader state or kernel vulnerability status.
+
 Use `PASS`, `FAIL` or `NOT TESTED`, and include a short note for each item.
 
 | Check | Result | Notes |
