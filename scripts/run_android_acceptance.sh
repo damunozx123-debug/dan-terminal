@@ -32,15 +32,18 @@ rm -rf app/build/outputs/androidTest-results/connected app/build/reports/android
 ready=false
 for ((check=0; check<60; check++)); do
   boot=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r') || boot=""
-  if [[ "$boot" == 1 ]] && adb shell pm path android 2>/dev/null | grep -q '^package:'; then
+  # Package Manager may be available while the shared-media FUSE mount is broken.
+  # UTP writes test output there; retain its readiness failure instead of hanging.
+  if [[ "$boot" == 1 ]] && adb shell pm path android 2>/dev/null | grep -q '^package:' \
+    && adb shell 'mkdir -p /sdcard/Download && touch /sdcard/Download/.dan-ci-readiness && rm -f /sdcard/Download/.dan-ci-readiness' > "$diag/storage-readiness.txt" 2>&1; then
     ready=true
     break
   fi
   sleep 2
 done
 if [[ "$ready" != true ]]; then
-  printf '%s\n' '{"status":"infrastructure-failure","reason":"boot-package-manager-timeout","retry":true,"executed":0}' > "$diag/result.json"
-  echo '::error::Android boot/Package Manager readiness timed out'
+  printf '%s\n' '{"status":"infrastructure-failure","reason":"boot-framework-storage-timeout","retry":true,"executed":0}' > "$diag/result.json"
+  echo '::error::Android boot/Package Manager/shared-storage readiness timed out'
   exit 1
 fi
 touch "$diag/readiness-passed"

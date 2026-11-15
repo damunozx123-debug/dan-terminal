@@ -20,7 +20,7 @@ com.android.ddmlib.InstallException: 'package install-create -r -t' returns erro
 
 class AcceptanceRunnerTest(unittest.TestCase):
     def run_fixture(self, *, boot_ready="1", test_exit=0, transient_adb="0",
-                    report=SUCCESS, output="", stale_report=None, run_retry=False):
+                    report=SUCCESS, output="", stale_report=None, run_retry=False, storage_ready="1"):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             bin_dir = root / "bin"
@@ -49,6 +49,8 @@ if [[ "$*" == 'shell getprop sys.boot_completed' ]]; then
   if [[ "$TRANSIENT_ADB" == 1 && ! -f adb-retried ]]; then touch adb-retried; exit 1; fi
   echo "$BOOT_READY"
 elif [[ "$*" == 'shell pm path android' ]]; then echo 'package:/system/framework/framework-res.apk'
+elif [[ "$*" == "shell "*"/sdcard/"* && "$STORAGE_READY" != 1 ]]; then
+  echo 'Transport endpoint is not connected' >&2; exit 1
 else echo 'fixture diagnostics'; fi
 """)
             (bin_dir / "sleep").write_text("#!/usr/bin/env bash\nexit 0\n")
@@ -72,7 +74,7 @@ raise SystemExit(int(os.environ['TEST_EXIT']))
                        RUNNER_TEMP=str(root), BOOT_READY=boot_ready,
                        TEST_EXIT=str(test_exit), TRANSIENT_ADB=transient_adb,
                        TEST_REPORT=report or "", TEST_OUTPUT=output,
-                       DAN_ACCEPTANCE_ATTEMPT="first")
+                       DAN_ACCEPTANCE_ATTEMPT="first", STORAGE_READY=storage_ready)
             result = subprocess.run(["bash", str(scripts / "run_android_acceptance.sh")], cwd=root, env=env,
                                     capture_output=True, text=True, timeout=20)
             diag = root / "dan-terminal-emulator-diagnostics"
@@ -125,6 +127,14 @@ raise SystemExit(int(os.environ['TEST_EXIT']))
         self.assertTrue(actual["gradle"])
         self.assertFalse(actual["started"])
         self.assertTrue(actual["retry"])
+
+    def test_unavailable_shared_storage_never_starts_gradle(self):
+        actual = self.run_fixture(storage_ready="0")
+        self.assertNotEqual(0, actual["exit"])
+        self.assertFalse(actual["gradle"])
+        self.assertFalse(actual["started"])
+        self.assertTrue(actual["retry"])
+        self.assertTrue(actual["diagnostics"])
 
     def test_real_assertion_failure_preserves_exit_code_without_retry(self):
         report = SUCCESS.replace('name="shellPersists"/>',
