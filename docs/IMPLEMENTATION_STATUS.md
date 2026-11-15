@@ -12,8 +12,9 @@ persistent signing configuration and checksum-pinned Gradle 8.13 wrapper.
 
 The first correction is commit `32f4345addb496694448b7741d129149e7bd1fdf`.
 [Android CI](https://github.com/damunozx123-debug/dan-terminal/actions/runs/43675351639)
-is evaluating it. Source checks passed; Android results must be read from the
-completed run before treating the correction as verified.
+is evaluating it. This run completed successfully: compilation/unit/lint, APK assembly and both
+Android 16 PTY tests passed (0 skipped, 0 failed). Physical Redmi checks remain
+required.
 
 ## PTY failure and correction
 
@@ -32,7 +33,14 @@ fresh-AVD retry only if instrumentation never started. Test failures remain
 failures. The build uploads a development APK even if Android acceptance fails;
 its artifact name explicitly says `unverified`.
 
-## Added source awaiting CI verification
+The broader candidate `baf2de0` compiled its production APK and passed JVM
+checks, but CI run 43676274888 failed Android-test lint dependency resolution:
+`ui-test-junit4` had no version because its Android-test configuration lacked
+the Compose BOM. The corrective change adds that BOM and compiles the test APK
+before emulator startup. The full candidate is not accepted until that run
+completes.
+
+## Added source awaiting full Android verification
 
 - M3: terminal redraw notifications, software controls (including application
   cursor-key mode), keyboard focus/IME inset handling, clipboard-copy callback,

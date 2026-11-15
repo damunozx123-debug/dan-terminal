@@ -32,7 +32,7 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("DAN Terminal", style = MaterialTheme.typography.headlineMedium)
-        Text("M0 + M1 baseline", style = MaterialTheme.typography.bodyMedium)
+        Text("Setup and tools", style = MaterialTheme.typography.bodyMedium)
         StatusCard(
             title = "Shizuku",
             value = when {

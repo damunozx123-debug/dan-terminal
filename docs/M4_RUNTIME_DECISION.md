@@ -59,3 +59,34 @@ Until these checks pass, M4 Linux runtime, profile and SSH/SFTP claims remain
 unimplemented. SSH library selection follows runtime selection so credentials
 and host verification can be designed against the actual storage/process
 boundary.
+
+## Focused source research — 15 November 2026
+
+Android's official API-29 behavior documentation prohibits direct execution of
+files under an app's writable home directory for apps targeting API 29+.
+DAN Terminal targets API 36. Therefore a proposed downloaded `filesDir/proot`
+executable is insufficient: the spike must establish a supported executable
+packaging/loader path and test it from the actual app UID, not merely ADB shell.
+
+Primary reference:
+https://developer.android.com/about/versions/10/behavior-changes-10#execute-permission
+
+A candidate source to evaluate is Termux's maintained Android PRoot fork. Its
+package build recipe currently identifies version `5.1.107.102`, a pinned
+source archive SHA-256
+`30d12a6e2cc4147123756ff58edea262d3083bbc238c12d0ab9b39e3d1c40852`,
+GPL-2.0, dependencies `libandroid-shmem` and `libtalloc`, and an unbundled loader
+installed into Termux's libexec prefix. This hash is for the source archive,
+not an Android ARM64 binary or a Debian image. The recipe is an input to a
+compatibility/licensing spike, not approval to copy Termux's binary paths into
+DAN Terminal.
+
+Primary references:
+https://github.com/termux/termux-packages/blob/master/packages/proot/build.sh
+https://github.com/termux/proot/blob/master/COPYING
+
+No PRoot binary, source dependency or Linux image was added to the APK. The
+next proof remains an APK-packaged Android ARM64 host executable plus loader
+whose Linux guest IO, resizing, signals and lifecycle attach to the current
+PTY under Android 16/HyperOS. Licence notices, corresponding source packaging,
+dependency compatibility and image integrity remain explicit review items.
