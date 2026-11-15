@@ -1,27 +1,45 @@
 package com.dan.terminal.feature.termux
 
 import android.app.Service
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Owns the app-sandbox shell and its PTY independently of the Compose screen.
- * The session lasts for the service process lifetime; Android process death ends it.
+ * Navigation retains the started service. Android may stop an unbound background
+ * service or kill the process; this prototype does not guarantee background survival.
  */
 class PtyTerminalService : Service() {
     inner class LocalBinder : Binder() {
         val session: TerminalSession
             get() = checkNotNull(terminalSession) { "PTY session is not initialized" }
+        val screenUpdates: StateFlow<Long> get() = updates.asStateFlow()
+        fun restartExitedSession() {
+            check(terminalSession?.isRunning != true) { "The shell is still running" }
+            terminalSession = createSession()
+            updates.value += 1
+        }
     }
 
     private val binder = LocalBinder()
     private var terminalSession: TerminalSession? = null
+    private val updates = MutableStateFlow(0L)
 
     override fun onCreate() {
         super.onCreate()
+        terminalSession = createSession()
+    }
+
+    private fun createSession(): TerminalSession {
         val home = filesDir.absolutePath
         val env = arrayOf(
             "HOME=$home",
@@ -29,7 +47,7 @@ class PtyTerminalService : Service() {
             "PATH=/system/bin:/system/xbin",
             "TERM=xterm-256color"
         )
-        terminalSession = TerminalSession(
+        return TerminalSession(
             "/system/bin/sh",
             home,
             arrayOf("-i"),
@@ -49,15 +67,18 @@ class PtyTerminalService : Service() {
         super.onDestroy()
     }
 
-    private object SessionClient : TerminalSessionClient {
-        override fun onTextChanged(changedSession: TerminalSession) = Unit
+    private val SessionClient = object : TerminalSessionClient {
+        override fun onTextChanged(changedSession: TerminalSession) { updates.value += 1 }
         override fun onTitleChanged(changedSession: TerminalSession) = Unit
-        override fun onSessionFinished(finishedSession: TerminalSession) = Unit
-        override fun onCopyTextToClipboard(session: TerminalSession, text: String) = Unit
+        override fun onSessionFinished(finishedSession: TerminalSession) { updates.value += 1 }
+        override fun onCopyTextToClipboard(session: TerminalSession, text: String) {
+            (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
+                .setPrimaryClip(ClipData.newPlainText("DAN Terminal selection", text))
+        }
         override fun onPasteTextFromClipboard(session: TerminalSession) = Unit
         override fun onBell(session: TerminalSession) = Unit
-        override fun onColorsChanged(session: TerminalSession) = Unit
-        override fun onTerminalCursorStateChange(state: Boolean) = Unit
+        override fun onColorsChanged(session: TerminalSession) { updates.value += 1 }
+        override fun onTerminalCursorStateChange(state: Boolean) { updates.value += 1 }
         override fun getTerminalCursorStyle(): Int? = null
         override fun logError(tag: String, message: String) = Unit
         override fun logWarn(tag: String, message: String) = Unit

@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.os.IBinder
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,10 +16,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,8 +74,9 @@ fun LocalShellScreen(
         }
     }
 
+    val revision = binder?.screenUpdates?.collectAsState()?.value
     val session = binder?.sessionOrNull()
-    Column(Modifier.fillMaxSize().padding(12.dp)) {
+    Column(Modifier.fillMaxSize().imePadding().padding(12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("DAN Terminal", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
             TextButton(onClick = onSettings) { Text("Setup") }
@@ -80,6 +86,28 @@ fun LocalShellScreen(
             "App sandbox · PTY session · Android UID",
             style = MaterialTheme.typography.labelSmall
         )
+        if (session != null) {
+            if (!session.isRunning) {
+                Row {
+                    Text("Shell exited (status ${session.exitStatus}).")
+                    TextButton(onClick = { binder?.restartExitedSession() }) { Text("Start new shell") }
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                TerminalInputKey.entries.forEach { key ->
+                    TextButton(
+                        onClick = {
+                            val bytes = key.bytes(session.emulator.isCursorKeysApplicationMode)
+                            session.write(bytes, 0, bytes.size)
+                        },
+                        enabled = session.isRunning
+                    ) { Text(key.label) }
+                }
+            }
+        }
         Box(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp)) {
             when {
                 serviceError != null -> Text(serviceError!!, color = MaterialTheme.colorScheme.error)
@@ -90,9 +118,16 @@ fun LocalShellScreen(
                         TerminalView(viewContext, null).apply {
                             setBackgroundColor(Color.rgb(16, 19, 24))
                             setTextSize(16)
-                            setTerminalViewClient(PtyTerminalViewClient)
+                            contentDescription = "Interactive terminal"
+                            isFocusableInTouchMode = true
+                            setTerminalViewClient(PtyTerminalViewClient(this))
                             attachSession(session)
+                            requestFocus()
                         }
+                    },
+                    update = { view ->
+                        view.attachSession(session)
+                        if (revision != null) view.onScreenUpdated()
                     }
                 )
             }
@@ -103,9 +138,13 @@ fun LocalShellScreen(
 private fun PtyTerminalService.LocalBinder.sessionOrNull(): TerminalSession? =
     runCatching { session }.getOrNull()
 
-private object PtyTerminalViewClient : TerminalViewClient {
+private class PtyTerminalViewClient(private val view: TerminalView) : TerminalViewClient {
     override fun onScale(scale: Float): Float = scale
-    override fun onSingleTapUp(e: MotionEvent) = Unit
+    override fun onSingleTapUp(e: MotionEvent) {
+        view.requestFocus()
+        (view.context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+            .showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
+    }
     override fun shouldBackButtonBeMappedToEscape() = false
     override fun shouldEnforceCharBasedInput() = false
     override fun shouldUseCtrlSpaceWorkaround() = false

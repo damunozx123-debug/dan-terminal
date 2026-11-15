@@ -18,6 +18,7 @@ import com.dan.terminal.di.LocalAppContainer
 import com.dan.terminal.feature.bluetooth.BluetoothScreen
 import com.dan.terminal.feature.bluetooth.GattScreen
 import com.dan.terminal.feature.shizuku.ShizukuScreen
+import com.dan.terminal.feature.network.NetworkDiagnosticsScreen
 import com.dan.terminal.feature.termux.TermuxScreen
 import com.dan.terminal.feature.termux.TerminalConsoleScreen
 import com.dan.terminal.feature.termux.LocalShellScreen
@@ -29,7 +30,7 @@ fun DanNavHost() {
     val context = LocalContext.current
     val preferences = remember(context) { context.getSharedPreferences("dan_terminal_setup", 0) }
     val initialRoute = remember(preferences) {
-        if (preferences.getBoolean("setup_completed", false)) "shell" else "home"
+        terminalStartRoute(preferences.getBoolean("setup_completed", false))
     }
     val container = LocalAppContainer.current
     val activeRequirement by container.accessCoordinator
@@ -66,6 +67,7 @@ fun DanNavHost() {
                 onBluetooth = { navController.navigate("bluetooth") },
                 onShizuku = { navController.navigate("shizuku") },
                 onTermux = { navController.navigate("termux") },
+                onNetworkDiagnostics = { navController.navigate("network") },
                 onConsole = {
                     preferences.edit().putBoolean("setup_completed", true).apply()
                     navController.navigate("shell") {
@@ -91,6 +93,7 @@ fun DanNavHost() {
         }
         composable("shizuku") { ShizukuScreen() }
         composable("termux") { TermuxScreen() }
+        composable("network") { NetworkDiagnosticsScreen(onBack = { navController.popBackStack() }) }
         composable("shell") {
             LocalShellScreen(
                 onSettings = { navController.navigate("home") },

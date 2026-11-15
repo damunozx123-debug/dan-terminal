@@ -7,6 +7,19 @@ on:
         description: 'Unique prerelease version, e.g. 0.1.0-dev.1'
         required: true
         type: string
+      physical_device_accepted:
+        description: 'I recorded Redmi acceptance for this exact commit in docs/REDMI_M3_ACCEPTANCE.md'
+        required: true
+        type: boolean
+        default: false
+      expected_signer_sha256:
+        description: 'Trusted DAN Terminal certificate SHA-256 fingerprint (64 hex characters)'
+        required: true
+        type: string
+      previous_version_code:
+        description: 'Highest previously distributed DAN Terminal Dev versionCode'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -16,11 +29,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Require recorded device acceptance
+        env:
+          ACCEPTED: ${{ inputs.physical_device_accepted }}
+        run: |
+          [[ "$ACCEPTED" == true ]] || {
+            echo "::error::Record physical Redmi acceptance before preparing a signed release candidate."
+            exit 1
+          }
       - name: Validate version
         shell: bash
         env:
           VERSION: ${{ inputs.version }}
         run: |
+          set -euo pipefail
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]+$ ]] || exit 1
           echo "TAG=v$VERSION" >> "$GITHUB_ENV"
       - uses: actions/setup-java@v4
@@ -31,12 +53,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
-      - name: Ensure Gradle wrapper
-        run: |
-          if [[ ! -f gradlew || ! -f gradle/wrapper/gradle-wrapper.jar ]]; then
-            gradle wrapper --gradle-version 8.13 --distribution-type bin
-          fi
-          chmod +x gradlew
+      - name: Ensure checksum-pinned Gradle wrapper
+        run: bash scripts/bootstrap_gradle_wrapper.sh
       - name: Require persistent signing secrets
         shell: bash
         env:
@@ -55,14 +73,17 @@ jobs:
           printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/dan-update.jks"
           test -s "$RUNNER_TEMP/dan-update.jks"
           echo "DAN_UPDATE_KEYSTORE=$RUNNER_TEMP/dan-update.jks" >> "$GITHUB_ENV"
-          echo "DAN_VERSION_CODE=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
-          echo "DAN_VERSION_NAME=${{ inputs.version }}" >> "$GITHUB_ENV"
+          echo "DAN_VERSION_CODE=$((10000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+          echo "DAN_VERSION_NAME=${TAG#v}" >> "$GITHUB_ENV"
           echo "DAN_UPDATE_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
           echo "DAN_UPDATE_STORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
           echo "DAN_UPDATE_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
       - name: Build and test with persistent signing
-        run: ./gradlew testDebugUnitTest :app:assembleDebug --stacktrace
+        run: ./gradlew testDebugUnitTest :app:lintDebug :app:assembleDebug --stacktrace
       - name: Verify APK signing and development identity
+        env:
+          EXPECTED_CERT: ${{ inputs.expected_signer_sha256 }}
+          PREVIOUS_CODE: ${{ inputs.previous_version_code }}
         shell: bash
         run: |
           set -euo pipefail
@@ -72,7 +93,10 @@ jobs:
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt -print -quit)"
           test -x "$APKSIGNER"
           test -x "$AAPT"
-          "$APKSIGNER" verify --verbose --print-certs "$APK"
+          export APKSIGNER
+          export APKANALYZER="$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer"
+          bash scripts/verify_release_candidate.sh "$APK" com.dan.terminal.dev "$DAN_VERSION_NAME" \
+            "$DAN_VERSION_CODE" "$PREVIOUS_CODE" "$EXPECTED_CERT" > release-verification.txt
           "$AAPT" dump badging "$APK" > "$RUNNER_TEMP/dan-dev-badging.txt"
           grep -Fq "package: name='com.dan.terminal.dev' " "$RUNNER_TEMP/dan-dev-badging.txt"
           grep -Fq "application-label:'DAN Terminal Dev'" "$RUNNER_TEMP/dan-dev-badging.txt"
@@ -81,12 +105,17 @@ jobs:
           test -s app/build/outputs/apk/debug/app-debug.apk
           cp app/build/outputs/apk/debug/app-debug.apk dan-terminal-dev.apk
           sha256sum dan-terminal-dev.apk > SHA256SUMS.txt
-      - name: Publish GitHub prerelease
+      - name: Record resolved runtime dependency tree
+        run: ./gradlew :app:dependencies --configuration debugRuntimeClasspath > resolved-dependencies.txt
+      - name: Remove temporary keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/dan-update.jks"
+      - name: Create draft GitHub prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$TAG" dan-terminal-dev.apk SHA256SUMS.txt \
+          gh release create "$TAG" dan-terminal-dev.apk SHA256SUMS.txt release-verification.txt resolved-dependencies.txt THIRD_PARTY_NOTICES.md \
             --target "$GITHUB_SHA" \
-            --prerelease \
+            --draft --prerelease \
             --title "DAN Terminal $TAG (development)" \
             --notes "Development APK signed using the persistent DAN_UPDATE key. Updates of the separate com.dan.terminal.dev app require the same certificate. The existing com.dan.terminal app is not replaced."

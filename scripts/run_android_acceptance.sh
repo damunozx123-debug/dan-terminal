@@ -17,7 +17,7 @@ trap capture EXIT
 # Emulator boot completion alone does not mean Package Manager is ready.
 ready=false
 for ((attempt=0; attempt<60; attempt++)); do
-  boot=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
+  boot=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r') || boot=""
   if [[ "$boot" == 1 ]] && adb shell pm path android 2>/dev/null | grep -q '^package:'; then
     ready=true
     break

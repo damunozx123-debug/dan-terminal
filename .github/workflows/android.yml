@@ -2,9 +2,9 @@ name: Android CI
 
 on:
   push:
-    branches: [ main, develop, 'feature/**', 'fix/**' ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main, develop, 'fix/**' ]
+    branches: [ main, develop ]
   workflow_dispatch:
 
 permissions:
@@ -23,9 +23,13 @@ jobs:
       - name: Validate source tree
         run: python3 scripts/validate_source_tree.py
       - name: Check bootstrap script
-        run: bash -n scripts/bootstrap_gradle_wrapper.sh app/src/main/assets/bootstrap/dan_bootstrap.sh
+        run: bash -n scripts/bootstrap_gradle_wrapper.sh scripts/run_android_acceptance.sh scripts/verify_release_candidate.sh app/src/main/assets/bootstrap/dan_bootstrap.sh
       - name: Test bootstrap success and failure
         run: python3 scripts/test_bootstrap.py
+      - name: Test emulator acceptance runner
+        run: python3 scripts/test_android_acceptance_runner.py
+      - name: Test release verification gates
+        run: bash scripts/tests/test_verify_release_candidate.sh
       - name: Check whitespace
         run: git diff --check
 

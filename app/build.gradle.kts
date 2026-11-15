@@ -56,6 +56,7 @@ dependencies {
     implementation(project(":core:security"))
     implementation(project(":core:shizuku"))
     implementation(project(":core:bluetooth"))
+    implementation(project(":core:network"))
     implementation(project(":feature:termux"))
     // The app manifest declares ShizukuProvider, so lint needs this on its own classpath.
     implementation(libs.shizuku.provider)
@@ -81,5 +82,7 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

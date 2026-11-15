@@ -98,6 +98,20 @@ class PtyTerminalServiceTest {
         sendBytes(session, (command + "\n").toByteArray(Charsets.UTF_8))
     }
 
+    @Test fun exitedShellCanBeRestartedAsAFreshSession() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val binder = serviceRule.bindService(Intent(context, PtyTerminalService::class.java)) as PtyTerminalService.LocalBinder
+        val old = binder.session
+        send(old, "export M3_OLD_STATE=old; exit 7")
+        awaitText(old, "[Process completed (code 7)")
+        assertTrue(!old.isRunning)
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { binder.restartExitedSession() }
+        val fresh = binder.session
+        assertTrue(fresh !== old && fresh.isRunning)
+        send(fresh, "printf '\\n%s=%s\\n' M3_NEW_STATE \"\${M3_OLD_STATE:-fresh}\"")
+        awaitText(fresh, "M3_NEW_STATE=fresh")
+    }
+
     private fun sendBytes(session: TerminalSession, bytes: ByteArray) {
         session.write(bytes, 0, bytes.size)
     }

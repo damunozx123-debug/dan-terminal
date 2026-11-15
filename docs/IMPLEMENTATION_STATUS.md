@@ -1,58 +1,75 @@
-# Implementation status — 10 November 2026
+# Implementation status — 15 November 2026
 
-DAN Terminal is an early M0/M1 Android companion app. The full 95-item roadmap
-is not complete. Device acceptance on the target Redmi/HyperOS phone is pending.
+DAN Terminal is progressing through M3 terminal work and selected M4–M6
+foundations. The 95-requirement roadmap is not complete. Physical
+Redmi/HyperOS acceptance and persistent-key release verification remain pending.
 
-## Evidence
+## Current delivery
 
-- Public repository and PR #1 are available; source checks pass.
-- [Run 42789936760](https://github.com/damunozx123-debug/dan-terminal/actions/runs/42789936760)
-  reproduced 8 failures in 10 Bluetooth regression tests before the fixes.
-- [Run 42791104590](https://github.com/damunozx123-debug/dan-terminal/actions/runs/42791104590)
-  compiled the debug APK and passed all **37 JVM unit tests** (0 failures/errors).
-  Lint found a missing app-level Shizuku provider dependency. That declaration
-  has been corrected; follow the latest CI run for the subsequent lint result.
-- Three bootstrap execution tests pass locally: success/retry, failed update,
-  and failed package installation. These use a fake package manager and do not
-  validate real Termux package installation.
-- Shell syntax, XML/TOML structure, requirement IDs and whitespace checks pass.
-- The Gradle 8.13 wrapper was generated in CI and retrieved with a verified
-  artifact SHA-256. Its distribution is checksum-pinned.
-- Independent static review found no additional blocking issue in the BLE,
-  GATT, Shizuku and permission changes. Static review is not device testing.
+PR #4 has been reconciled with `main` while retaining the separate development
+application ID `com.dan.terminal.dev`, its `DAN Terminal Dev` launcher label,
+persistent signing configuration and checksum-pinned Gradle 8.13 wrapper.
 
-## Implemented behavior
+The first correction is commit `32f4345addb496694448b7741d129149e7bd1fdf`.
+[Android CI](https://github.com/damunozx123-debug/dan-terminal/actions/runs/43675351639)
+is evaluating it. Source checks passed; Android results must be read from the
+completed run before treating the correction as verified.
 
-- Contextual runtime permission requests for BLE scan, BLE connection and Termux.
-- Shizuku service/authorization recovery, refusal for unsupported legacy services,
-  blocked permission guidance and correct handling of delayed permission results.
-- BLE advertisements remain visible when a protected device name cannot be read;
-  broadcast-only advertisements do not offer GATT connections.
-- Each GATT attempt owns its callback identity. Old callbacks cannot reopen or
-  replace a new session. Terminal failures and disconnects close the connection.
-- Scans and connections stop when their screens are left or the app backgrounds.
-- Termux bootstrap package failures remain visible and prevent false completion.
+## PTY failure and correction
 
-## Phone acceptance still required
+[Push run 43561378105](https://github.com/damunozx123-debug/dan-terminal/actions/runs/43561378105)
+failed at `b44215ba` with `TerminalBuffer.setChar: column=80, mColumns=80`.
+The crash occurred in the main-thread output handler while the instrumentation
+test resized/read the emulator on a different thread. The pinned Termux API
+requires emulator operations on the main thread. The tests now serialize these
+operations, check an exact 80-cell line plus autowrap, and exercise repeated
+80↔100-column reflow while shell output is active. Shell markers are formatted
+from separate arguments so command echo cannot satisfy their assertions.
 
-1. Install and launch the debug APK on the Redmi.
-2. Deny and grant Nearby devices; scan with Bluetooth on/off; leave and return
-   during a scan. Background the app and verify scanning stops.
-3. Connect to a known BLE peripheral; browse services; disconnect/reconnect;
-   background the app; turn Bluetooth off during a connection.
-4. Start with Shizuku stopped, pair/start it, grant/deny authorization, revoke it
-   in Shizuku, stop/restart the service, rotate the screen and reopen the app.
-5. Install/open Termux, enable external apps, grant RUN_COMMAND, run the
-   bootstrap twice and inspect its output. Verify HyperOS background restrictions.
+Emulator boot is a separate CI concern. Readiness now checks boot completion and
+Package Manager, captures ADB/logcat before emulator teardown, and permits one
+fresh-AVD retry only if instrumentation never started. Test failures remain
+failures. The build uploads a development APK even if Android acceptance fails;
+its artifact name explicitly says `unverified`.
 
-No instrumented tests, physical BLE session, Shizuku Binder operation or real
-Termux execution on the phone has been observed in this work session.
+## Added source awaiting CI verification
 
-## Remaining scope
+- M3: terminal redraw notifications, software controls (including application
+  cursor-key mode), keyboard focus/IME inset handling, clipboard-copy callback,
+  explicit exited-shell restart, and activity-recreation/Android-IME tests.
+- M4: `M4_RUNTIME_DECISION.md` records the app-private runtime-to-PTY gate. No
+  production Linux runtime or SSH backend has been selected or installed.
+- M5: user-triggered connectivity diagnostics, IO-dispatched probes, local
+  bounded history and scoped-document CSV/PDF export. The code adapts Net Intel
+  concepts with its MIT notice. It does not discover LAN devices or detect new
+  devices. PDF pagination and history lifecycle tests are included.
+- M5 GATT: a pure approval-policy scaffold exists; it is not connected to a
+  device write transport. Peripheral-write support is not accepted.
+- M6: the candidate-verification script checks package/version, increasing
+  versionCode, trusted signer fingerprint and optional APK SHA-256. Shell tests
+  pass. The manual signing workflow requires device acceptance and creates a
+  draft prerelease with verification evidence. It has not been dispatched.
 
-An M3.1 app-owned PTY service and terminal-view integration have been added on
-the feature branch. The Android instrumented PTY acceptance test has not yet
-run; compilation, emulator execution, and Redmi/HyperOS testing are pending.
-Distribution profiles, SSH/Mosh screens, graphics protocols, and GATT
-read/write/notify UI remain roadmap work. Existing partial requirement statuses
-remain partial.
+## Evidence limits
+
+Local source/XML/TOML checks, bootstrap execution tests, release-script tests,
+workflow/shell syntax and whitespace checks pass. Local Gradle/Android execution
+has not run: the environment lacks a ready Android toolchain and previous Gradle
+downloads failed. GitHub CI is the build/emulator verification path.
+
+Earlier run 43551499671 passed the previous baseline on an Android 16 emulator;
+the later failure above prevents treating that older pass as current acceptance.
+No emulator result substitutes for Dan's physical-device checks. No production
+release or signed candidate has been produced in this work session.
+
+## Still open
+
+- Complete rendered-screen resize, clipboard/paste and software-key acceptance;
+  then tabs/named sessions and the remaining M3 controls.
+- Record Redmi tests in `REDMI_M3_ACCEPTANCE.md` for the exact delivered APK.
+- Prove an ARM64 Linux child process can attach to the app-owned PTY before M4
+  backend selection; then implement profile/SSH host-key and credential gates.
+- Integrate GATT write approvals and verify real peripheral behavior.
+- Resolve dependency licences/SBOM, verify persistent signing and record actual
+  release certificate/version/checksum. A dependency tree is not an SBOM.
+- Evaluate graphics protocols independently; no Kitty/Sixel support is claimed.

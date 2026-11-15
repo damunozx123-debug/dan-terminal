@@ -28,6 +28,22 @@ Upstream source and library guidance:
 https://github.com/termux/termux-app/tree/v0.118.0/terminal-view
 https://github.com/termux/termux-app/tree/v0.118.0/terminal-emulator
 
+## Net Intel connectivity model
+
+The connectivity diagnostics module adapts the read-only measurement fields,
+failure handling and report concepts from `damunozx123-debug/net-intel-app-v9`
+(MIT, copyright (c) 2026 Project contributors). The synchronous Android UI,
+SharedPreferences model and exporter implementation were not copied; DAN
+Terminal uses an injected probe transport, coroutine IO execution and its own
+storage/export APIs. The full MIT notice is retained at
+`licenses/Net-Intel-MIT.txt`.
+
+Reviewed upstream snapshot: `b565fb691760beea1f24da097e168b62a2bbafe8`.
+Relevant source references: `ProbeEngine.java`, `ScanResult.java`,
+`HistoryStore.java` and `ReportExporter.java` under
+`android/app/src/main/java/nz/netintel/mobile/`.
+Upstream source: https://github.com/damunozx123-debug/net-intel-app-v9
+
 ## Remaining dependency audit
 
 AndroidX/Compose, Kotlin, coroutines, test libraries, build tools and their

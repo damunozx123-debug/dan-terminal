@@ -39,3 +39,12 @@ This slice verifies a single local PTY session and exposes it through the
 existing terminal route. It does not claim tabs, session restoration after OS
 process death, background survival guarantees, Linux distribution profiles,
 accessibility review, or physical Redmi acceptance. Those remain separate work.
+
+## Background lifetime limit
+
+The prototype uses a started/bound service, not a foreground service. Android
+may stop it after background idle once the terminal screen has unbound, or kill
+the process. Navigation while the service is retained keeps shell state;
+indefinite background survival is not guaranteed. `onDestroy` ends the shell.
+A foreground-service/notification implementation and Redmi battery-policy
+acceptance are still required for stronger background guarantees.

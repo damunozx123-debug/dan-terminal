@@ -21,7 +21,8 @@ fun HomeScreen(
     onBluetooth: () -> Unit,
     onShizuku: () -> Unit,
     onTermux: () -> Unit,
-    onConsole: () -> Unit
+    onConsole: () -> Unit,
+    onNetworkDiagnostics: () -> Unit
 ) {
     val container = LocalAppContainer.current
     val shizuku by container.shizukuManager.state.collectAsState()
@@ -53,6 +54,9 @@ fun HomeScreen(
         }
         Button(onClick = onBluetooth, modifier = Modifier.fillMaxWidth()) {
             Text("Bluetooth / BLE / GATT")
+        }
+        Button(onClick = onNetworkDiagnostics, modifier = Modifier.fillMaxWidth()) {
+            Text("Connectivity diagnostics")
         }
         Button(onClick = onShizuku, modifier = Modifier.fillMaxWidth()) {
             Text("Shizuku privilege broker")
