@@ -30,7 +30,8 @@ class TermuxCommandResultReceiver : BroadcastReceiver() {
             id = id,
             stdout = result.getString("stdout").orEmpty(),
             stderr = result.getString("stderr").orEmpty(),
-            exitCode = result.getInt("exit_code", -1),
+            // Termux's PendingIntent result Bundle uses camelCase (v0.118+).
+            exitCode = result.getInt("exitCode", -1),
             error = executionError
         )
     }

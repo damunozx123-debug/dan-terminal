@@ -10,12 +10,15 @@ SUCCESS = """<testsuite tests="2" failures="0" errors="0" skipped="0">
 <testcase classname="com.dan.AcceptanceTest" name="shellPersists"/>
 <testcase classname="com.dan.AcceptanceTest" name="wrapsAt80Columns"/>
 </testsuite>"""
-INSTALL_FAILURE = "Unknown failure: cmd: Can't find service: package"
+INSTALL_FAILURE = """Starting 0 tests on dan-api36-first(AVD) - 16
+Failed to install split APK(s): [/tmp/app-debug.apk]
+com.android.ddmlib.InstallException: 'package install-create -r -t' returns error 'Unknown failure: cmd: Can't find service: package'
+"""
 
 
 class AcceptanceRunnerTest(unittest.TestCase):
     def run_fixture(self, *, boot_ready="1", test_exit=0, transient_adb="0",
-                    report=SUCCESS, output="", stale_report=None):
+                    report=SUCCESS, output="", stale_report=None, run_retry=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             bin_dir = root / "bin"
@@ -63,6 +66,21 @@ raise SystemExit(int(os.environ['TEST_EXIT']))
             result = subprocess.run(["bash", str(RUNNER)], cwd=root, env=env,
                                     capture_output=True, text=True, timeout=20)
             diag = root / "dan-terminal-emulator-diagnostics"
+            retained = {}
+            if run_retry:
+                retry_env = dict(env, DAN_ACCEPTANCE_ATTEMPT="retry", TEST_EXIT="0",
+                                 TEST_REPORT=SUCCESS, TEST_OUTPUT="fresh emulator")
+                retry = subprocess.run(["bash", str(RUNNER)], cwd=root, env=retry_env,
+                                       capture_output=True, text=True, timeout=20)
+                retained = {
+                    "retry_exit": retry.returncode,
+                    "first_log": (diag / "first/gradle.log").read_text(),
+                    "retry_log": (diag / "retry/gradle.log").read_text(),
+                    "first_reports": [p.read_text() for p in (diag / "first/test-results").rglob("*.xml")],
+                    "retry_reports": [p.read_text() for p in (diag / "retry/test-results").rglob("*.xml")],
+                    "first_retry": (diag / "first/retryable-infrastructure").exists(),
+                    "retry_retry": (diag / "retry/retryable-infrastructure").exists(),
+                }
             return {
                 "exit": result.returncode,
                 "started": bool(list(diag.rglob("tests-started"))),
@@ -70,6 +88,7 @@ raise SystemExit(int(os.environ['TEST_EXIT']))
                 "gradle": (root / "gradle-called").exists(),
                 "diagnostics": bool(list(diag.rglob("logcat.txt"))),
                 "output": result.stdout + result.stderr,
+                **retained,
             }
 
     def test_ready_emulator_requires_the_complete_passing_suite(self):
@@ -158,11 +177,42 @@ raise SystemExit(int(os.environ['TEST_EXIT']))
         self.assertNotEqual(0, actual["exit"])
         self.assertFalse(actual["retry"])
 
+    def test_report_error_is_not_hidden_by_installation_log(self):
+        report = '<testsuite tests="0" errors="1"><error message="instrumentation failed"/></testsuite>'
+        actual = self.run_fixture(test_exit=1, report=report, output=INSTALL_FAILURE)
+        self.assertFalse(actual["retry"])
+
+    def test_declared_zero_total_cannot_validate_passing_cases(self):
+        report = SUCCESS.replace('tests="2"', 'tests="0"')
+        self.assertNotEqual(0, self.run_fixture(report=report)["exit"])
+
+    def test_crash_log_cannot_be_hidden_by_passing_xml(self):
+        actual = self.run_fixture(output="INSTRUMENTATION_RESULT: shortMsg=Process crashed.")
+        self.assertNotEqual(0, actual["exit"])
+        self.assertFalse(actual["retry"])
+
+    def test_unrelated_failure_with_package_message_is_not_retryable(self):
+        actual = self.run_fixture(test_exit=1, report=None,
+                                  output="Dependency resolution failed: Can't find service: package")
+        self.assertFalse(actual["retry"])
+
     def test_transient_adb_failure_is_retried_in_readiness_loop(self):
         actual = self.run_fixture(transient_adb="1")
         self.assertEqual(0, actual["exit"], actual["output"])
         self.assertTrue(actual["started"])
         self.assertTrue(actual["gradle"])
+
+    def test_retry_retains_first_failure_evidence_without_reusing_its_state(self):
+        actual = self.run_fixture(test_exit=1, report='<testsuite tests="0"/>',
+                                  output=INSTALL_FAILURE, run_retry=True)
+        self.assertEqual(1, actual["exit"])
+        self.assertEqual(0, actual["retry_exit"])
+        self.assertIn("Can't find service: package", actual["first_log"])
+        self.assertEqual("fresh emulator\n", actual["retry_log"])
+        self.assertEqual(['<testsuite tests="0"/>'], actual["first_reports"])
+        self.assertEqual([SUCCESS], actual["retry_reports"])
+        self.assertTrue(actual["first_retry"])
+        self.assertFalse(actual["retry_retry"])
 
 
 if __name__ == "__main__":

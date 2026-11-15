@@ -34,13 +34,18 @@ def main():
             failed |= any(node.tag in ("failure", "error", "skipped") for node in root.iter())
             for suite in root.iter("testsuite"):
                 failed |= any(int(suite.get(key, "0")) != 0 for key in ("failures", "errors", "skipped"))
+                if suite.get("tests") is not None and int(suite.get("tests")) != len(list(suite.iter("testcase"))):
+                    print(f"::error::Inconsistent Android testcase total in {report}")
+                    invalid = True
         except (ElementTree.ParseError, OSError, ValueError) as error:
             print(f"::error::Invalid Android report {report}: {error}")
             invalid = True
 
     log = args.log.read_text(errors="replace")
+    crashed = bool(re.search(r"INSTRUMENTATION_FAILED|INSTRUMENTATION_RESULT:\s*shortMsg=|Process crashed", log, re.IGNORECASE))
+    failed |= crashed
     started = bool(cases) or bool(re.search(
-        r"Starting \d+ tests on|INSTRUMENTATION_(?:STATUS|RESULT|FAILED)\b|Process crashed",
+        r"Starting [1-9]\d* tests on|INSTRUMENTATION_(?:STATUS|RESULT|FAILED)\b|Process crashed",
         log, re.IGNORECASE,
     ))
     if started:
@@ -48,7 +53,10 @@ def main():
 
     # An app assertion/crash, corrupt report, or unknown Gradle failure stays red.
     # The known install error can occur after our initial readiness check.
-    if args.gradle_exit and not started and not invalid and "Can't find service: package" in log:
+    install_failed = "Can't find service: package" in log and bool(re.search(
+        r"Failed to install (?:split )?APK|com\.android\.ddmlib\.InstallException", log,
+    ))
+    if args.gradle_exit and not started and not invalid and not failed and install_failed:
         (args.diagnostics / "retryable-infrastructure").touch()
         print("::error::Package Manager failed before instrumentation; fresh-emulator retry allowed.")
         return args.gradle_exit
