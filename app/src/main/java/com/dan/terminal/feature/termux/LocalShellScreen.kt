@@ -17,8 +17,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontFamily
 import com.termux.terminal.TerminalSession
 import com.termux.view.TerminalView
 import com.termux.view.TerminalViewClient
@@ -75,6 +79,7 @@ fun LocalShellScreen(
     }
 
     val revision = binder?.screenUpdates?.collectAsState()?.value
+    val pendingPaste = binder?.pendingClipboardPaste?.collectAsState()?.value
     val session = binder?.sessionOrNull()
     Column(Modifier.fillMaxSize().imePadding().padding(12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -132,6 +137,29 @@ fun LocalShellScreen(
                 )
             }
         }
+    }
+    if (pendingPaste != null) {
+        AlertDialog(
+            onDismissRequest = { binder?.cancelClipboardPaste() },
+            title = { Text("Paste multiple lines?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Newlines may submit commands to the shell. Review the text before pasting.")
+                    Text(
+                        pendingPaste,
+                        modifier = Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()),
+                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { binder?.confirmClipboardPaste() }) { Text("Paste text") }
+            },
+            dismissButton = {
+                TextButton(onClick = { binder?.cancelClipboardPaste() }) { Text("Cancel paste") }
+            }
+        )
     }
 }
 

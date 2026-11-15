@@ -32,6 +32,7 @@ Use `PASS`, `FAIL` or `NOT TESTED`, and include a short note for each item.
 | Ctrl+D, Esc, Tab and arrow-key controls behave as expected | NOT TESTED | The new software control row is source-only until a newer APK is built. |
 | Rotate/change visible area and confirm shell `stty size` updates | NOT TESTED | |
 | Scrollback, copy/paste and Unicode output | NOT TESTED | |
+| Multiline paste previews text; Cancel sends nothing; Paste text confirms | NOT TESTED | Include LF and CR/CRLF clipboard text; verify shell exit/restart clears a pending paste. |
 | Navigate to Settings/Tools and return without losing the live session | NOT TESTED | |
 | Background/resume, screen lock and battery restrictions | NOT TESTED | |
 | Force-stop/relaunch starts a clearly new PTY session | NOT TESTED | A shell process is not restored after Android process death. |

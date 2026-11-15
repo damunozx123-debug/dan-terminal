@@ -23,8 +23,12 @@ class PtyTerminalService : Service() {
         val session: TerminalSession
             get() = checkNotNull(terminalSession) { "PTY session is not initialized" }
         val screenUpdates: StateFlow<Long> get() = updates.asStateFlow()
+        val pendingClipboardPaste: StateFlow<String?> get() = clipboardPaste.pendingText
+        fun confirmClipboardPaste() = clipboardPaste.confirm()
+        fun cancelClipboardPaste() = clipboardPaste.cancel()
         fun restartExitedSession() {
             check(terminalSession?.isRunning != true) { "The shell is still running" }
+            clipboardPaste.cancel()
             terminalSession = createSession()
             updates.value += 1
         }
@@ -33,6 +37,9 @@ class PtyTerminalService : Service() {
     private val binder = LocalBinder()
     private var terminalSession: TerminalSession? = null
     private val updates = MutableStateFlow(0L)
+    private val clipboardPaste = TerminalClipboardPaste { text ->
+        terminalSession?.takeIf { it.isRunning }?.emulator?.paste(text)
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -62,6 +69,7 @@ class PtyTerminalService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_NOT_STICKY
 
     override fun onDestroy() {
+        clipboardPaste.cancel()
         terminalSession?.finishIfRunning()
         terminalSession = null
         super.onDestroy()
@@ -70,12 +78,22 @@ class PtyTerminalService : Service() {
     private val SessionClient = object : TerminalSessionClient {
         override fun onTextChanged(changedSession: TerminalSession) { updates.value += 1 }
         override fun onTitleChanged(changedSession: TerminalSession) = Unit
-        override fun onSessionFinished(finishedSession: TerminalSession) { updates.value += 1 }
+        override fun onSessionFinished(finishedSession: TerminalSession) {
+            if (finishedSession === terminalSession) clipboardPaste.cancel()
+            updates.value += 1
+        }
         override fun onCopyTextToClipboard(session: TerminalSession, text: String) {
             (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
                 .setPrimaryClip(ClipData.newPlainText("DAN Terminal selection", text))
         }
-        override fun onPasteTextFromClipboard(session: TerminalSession) = Unit
+        override fun onPasteTextFromClipboard(session: TerminalSession) {
+            if (session !== terminalSession || !session.isRunning) return
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = clipboard.primaryClip ?: return
+            if (clip.itemCount == 0) return
+            val text = clip.getItemAt(0).coerceToText(this@PtyTerminalService)?.toString().orEmpty()
+            clipboardPaste.request(text)
+        }
         override fun onBell(session: TerminalSession) = Unit
         override fun onColorsChanged(session: TerminalSession) { updates.value += 1 }
         override fun onTerminalCursorStateChange(state: Boolean) { updates.value += 1 }

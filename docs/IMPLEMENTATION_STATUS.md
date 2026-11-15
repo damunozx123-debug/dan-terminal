@@ -81,3 +81,8 @@ release or signed candidate has been produced in this work session.
 - Resolve dependency licences/SBOM, verify persistent signing and record actual
   release certificate/version/checksum. A dependency tree is not an SBOM.
 - Evaluate graphics protocols independently; no Kitty/Sixel support is claimed.
+
+
+## 16 November 2026 repair candidate
+
+Paste, multiline-paste approval, the Termux `exitCode` callback and pre-test CI failure classification have source changes with regression coverage. See [the repair work log](WORK_LOG_2026_11_16.md). Offline fixtures pass; exact-candidate Kotlin/build and all 16 required Android tests must still pass CI before acceptance. The Redmi record remains NOT TESTED. Do not reuse an older commit’s passing tests as evidence for this candidate.

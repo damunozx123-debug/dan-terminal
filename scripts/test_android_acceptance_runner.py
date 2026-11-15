@@ -1,5 +1,7 @@
 """Exercise acceptance/retry decisions with isolated ADB/Gradle fixtures."""
 import os
+import json
+import shutil
 from pathlib import Path
 import subprocess
 import tempfile
@@ -23,6 +25,12 @@ class AcceptanceRunnerTest(unittest.TestCase):
             root = Path(directory)
             bin_dir = root / "bin"
             bin_dir.mkdir()
+            scripts = root / "scripts"
+            scripts.mkdir()
+            for name in ["run_android_acceptance.sh", "verify_android_acceptance.py"]:
+                shutil.copy2(RUNNER.parent / name, scripts / name)
+            (scripts / "android_acceptance_expected.txt").write_text(
+                "com.dan.AcceptanceTest#shellPersists\ncom.dan.AcceptanceTest#wrapsAt80Columns\n")
             source = root / "app/src/androidTest/java/com/dan/AcceptanceTest.kt"
             source.parent.mkdir(parents=True)
             source.write_text("""package com.dan
@@ -46,6 +54,8 @@ else echo 'fixture diagnostics'; fi
             (bin_dir / "sleep").write_text("#!/usr/bin/env bash\nexit 0\n")
             (root / "gradlew").write_text("""#!/usr/bin/env python3
 import os
+import json
+import shutil
 from pathlib import Path
 Path('gradle-called').touch()
 report = os.environ['TEST_REPORT']
@@ -63,28 +73,29 @@ raise SystemExit(int(os.environ['TEST_EXIT']))
                        TEST_EXIT=str(test_exit), TRANSIENT_ADB=transient_adb,
                        TEST_REPORT=report or "", TEST_OUTPUT=output,
                        DAN_ACCEPTANCE_ATTEMPT="first")
-            result = subprocess.run(["bash", str(RUNNER)], cwd=root, env=env,
+            result = subprocess.run(["bash", str(scripts / "run_android_acceptance.sh")], cwd=root, env=env,
                                     capture_output=True, text=True, timeout=20)
             diag = root / "dan-terminal-emulator-diagnostics"
             retained = {}
             if run_retry:
                 retry_env = dict(env, DAN_ACCEPTANCE_ATTEMPT="retry", TEST_EXIT="0",
                                  TEST_REPORT=SUCCESS, TEST_OUTPUT="fresh emulator")
-                retry = subprocess.run(["bash", str(RUNNER)], cwd=root, env=retry_env,
+                retry = subprocess.run(["bash", str(scripts / "run_android_acceptance.sh")], cwd=root, env=retry_env,
                                        capture_output=True, text=True, timeout=20)
                 retained = {
                     "retry_exit": retry.returncode,
                     "first_log": (diag / "first/gradle.log").read_text(),
                     "retry_log": (diag / "retry/gradle.log").read_text(),
-                    "first_reports": [p.read_text() for p in (diag / "first/test-results").rglob("*.xml")],
-                    "retry_reports": [p.read_text() for p in (diag / "retry/test-results").rglob("*.xml")],
-                    "first_retry": (diag / "first/retryable-infrastructure").exists(),
-                    "retry_retry": (diag / "retry/retryable-infrastructure").exists(),
+                    "first_reports": [p.read_text() for p in (diag / "first/androidTest-results").rglob("*.xml")],
+                    "retry_reports": [p.read_text() for p in (diag / "retry/androidTest-results").rglob("*.xml")],
+                    "first_retry": json.loads((diag / "first/result.json").read_text()).get("retry", False),
+                    "retry_retry": json.loads((diag / "retry/result.json").read_text()).get("retry", False),
                 }
+            outcome = json.loads((diag / "first/result.json").read_text())
             return {
                 "exit": result.returncode,
-                "started": bool(list(diag.rglob("tests-started"))),
-                "retry": bool(list(diag.rglob("retryable-infrastructure"))),
+                "started": outcome.get("executed", 0) > 0,
+                "retry": outcome.get("retry", False),
                 "gradle": (root / "gradle-called").exists(),
                 "diagnostics": bool(list(diag.rglob("logcat.txt"))),
                 "output": result.stdout + result.stderr,
