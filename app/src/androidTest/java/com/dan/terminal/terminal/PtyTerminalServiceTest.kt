@@ -7,10 +7,12 @@ import androidx.test.rule.ServiceTestRule
 import com.dan.terminal.feature.termux.PtyTerminalService
 import com.termux.terminal.TerminalSession
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 @RunWith(AndroidJUnit4::class)
 class PtyTerminalServiceTest {
@@ -26,24 +28,70 @@ class PtyTerminalServiceTest {
         val appHome = context.filesDir.absolutePath
 
         assertTrue("shell should be running", session.isRunning)
-        session.updateSize(100, 40)
-        send(session, "test -t 0 && printf '\\nM3_TTY=YES\\n' || printf '\\nM3_TTY=NO\\n'")
+        resizeOnMainThread(session, columns = 100, rows = 40)
+        val dimensions = AtomicReference<Pair<Int, Int>>()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            dimensions.set(session.emulator.mColumns to session.emulator.mRows)
+        }
+        assertTrue("resize should update emulator columns", dimensions.get().first == 100)
+        assertTrue("resize should update emulator rows", dimensions.get().second == 40)
+        send(session, "test -t 0 && printf '\\n%s=%s\\n' M3_TTY YES || printf '\\n%s=%s\\n' M3_TTY NO")
         awaitText(session, "M3_TTY=YES")
 
-        send(session, "cd \"\$HOME\"; export M3_SESSION_MARK=dan; printf '\\nM3_PWD=%s\\nM3_MARK=%s\\n' \"\$PWD\" \"\$M3_SESSION_MARK\"")
+        send(session, "cd \"\$HOME\"; export M3_SESSION_MARK=dan; printf '\\n%s=%s\\n%s=%s\\n' M3_PWD \"\$PWD\" M3_MARK \"\$M3_SESSION_MARK\"")
         awaitText(session, "M3_MARK=dan")
-        assertTrue(session.emulator.screen.transcriptText.contains("M3_PWD=$appHome"))
+        assertTrue(transcriptTextOnMainThread(session).contains("M3_PWD=$appHome"))
 
         send(session, "stty size")
         awaitText(session, "40 100")
 
-        send(session, "sleep 30")
-        awaitText(session, "sleep 30")
-        Thread.sleep(300)
+        send(session, "printf '\\n%s=%s\\n' M3_SLEEP READY; sleep 30")
+        awaitText(session, "M3_SLEEP=READY")
         sendBytes(session, byteArrayOf(0x03))
-        send(session, "printf '\\nM3_AFTER_INTERRUPT=YES\\n'")
+        send(session, "printf '\\n%s=%s\\n' M3_AFTER_INTERRUPT YES")
         awaitText(session, "M3_AFTER_INTERRUPT=YES")
         assertTrue("shell should remain available after Ctrl+C", session.isRunning)
+    }
+
+    @Test
+    fun exactly80ColumnsThenWrapDoesNotAddressColumn80() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val binder = serviceRule.bindService(Intent(context, PtyTerminalService::class.java))
+            as PtyTerminalService.LocalBinder
+        val session = binder.session
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+
+        resizeOnMainThread(session, columns = 80, rows = 24)
+        val dimensions = AtomicReference<Pair<Int, Int>>()
+        instrumentation.runOnMainSync {
+            dimensions.set(session.emulator.mColumns to session.emulator.mRows)
+        }
+        assertTrue("terminal should use exactly 80 columns", dimensions.get().first == 80)
+        assertTrue("terminal should use 24 rows", dimensions.get().second == 24)
+
+        // Disable echo/prompts, then clear/home the cursor: exactly 80 cells (0..79),
+        // followed by X at row 1, column 0. Assertions inspect actual output, not echo.
+        send(session, "stty -echo; PS1=''; printf '\\n%s=%s\\n' M3_EDGE READY")
+        awaitText(session, "M3_EDGE=READY")
+        send(session, "printf '\\033[2J\\033[H%080dX' 0")
+        awaitText(session, "0".repeat(80) + "X")
+        instrumentation.runOnMainSync {
+            val screen = session.emulator.screen
+            assertEquals("0".repeat(80), screen.getSelectedText(0, 0, 79, 0))
+            assertEquals("X", screen.getSelectedText(0, 1, 0, 1))
+            assertTrue(session.emulator.cursorCol in 0..79)
+        }
+
+        // Exercise reflow while the output queue is active. Only the main thread
+        // may mutate/read emulator state, just as TerminalView does in production.
+        send(session, "i=0; while [ \$i -lt 100 ]; do printf '%080dX\\n' 0; i=\$((i+1)); done; printf '\\n%s=%s\\n' M3_REFLOW OK")
+        repeat(10) {
+            resizeOnMainThread(session, columns = 100, rows = 40)
+            resizeOnMainThread(session, columns = 80, rows = 24)
+        }
+        awaitText(session, "M3_REFLOW=OK")
+        send(session, "stty size")
+        awaitText(session, "24 80")
     }
 
     private fun send(session: TerminalSession, command: String) {
@@ -58,9 +106,23 @@ class PtyTerminalServiceTest {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(8)
         while (System.nanoTime() < deadline) {
             InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-            if (session.emulator.screen.transcriptText.contains(expected)) return
+            if (transcriptTextOnMainThread(session).contains(expected)) return
             Thread.sleep(50)
         }
-        throw AssertionError("Timed out waiting for '$expected'. Transcript: ${session.emulator.screen.transcriptText}")
+        throw AssertionError("Timed out waiting for '$expected'. Transcript: ${transcriptTextOnMainThread(session)}")
+    }
+
+    private fun resizeOnMainThread(session: TerminalSession, columns: Int, rows: Int) {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            session.updateSize(columns, rows)
+        }
+    }
+
+    private fun transcriptTextOnMainThread(session: TerminalSession): String {
+        val transcript = AtomicReference<String>()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            transcript.set(session.emulator.screen.transcriptText)
+        }
+        return transcript.get()
     }
 }

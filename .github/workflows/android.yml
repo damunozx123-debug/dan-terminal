@@ -85,21 +85,69 @@ jobs:
           grep -Fq "launchable-activity: name='com.dan.terminal.MainActivity'" "$RUNNER_TEMP/dan-apk-badging.txt"
 
       - name: Run PTY acceptance test on Android 16 emulator
+        id: acceptance
+        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 36
           target: google_apis
           arch: x86_64
           profile: pixel_6
+          avd-name: dan-api36-first
+          emulator-boot-timeout: 900
           disable-animations: true
-          script: ./gradlew :app:connectedDebugAndroidTest --stacktrace
+          script: bash scripts/run_android_acceptance.sh
 
-      - name: Upload instrumented test reports
+      - name: Classify emulator startup failure
+        id: boot_failure
+        if: steps.acceptance.outcome == 'failure'
+        shell: bash
+        run: |
+          if [[ -f "$RUNNER_TEMP/dan-terminal-emulator-diagnostics/tests-started" ]]; then
+            echo "retry=false" >> "$GITHUB_OUTPUT"
+            echo "Instrumentation started; preserving test failure."
+          else
+            echo "retry=true" >> "$GITHUB_OUTPUT"
+            echo "Instrumentation never started; retrying a fresh emulator once."
+          fi
+
+      - name: Retry emulator startup once
+        id: acceptance_retry
+        if: steps.boot_failure.outputs.retry == 'true'
+        continue-on-error: true
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          avd-name: dan-api36-retry
+          emulator-port: 5556
+          force-avd-creation: true
+          emulator-boot-timeout: 900
+          disable-animations: true
+          script: bash scripts/run_android_acceptance.sh
+
+      - name: Require passing PTY acceptance
+        if: always() && steps.acceptance.outcome != 'skipped'
+        env:
+          FIRST: ${{ steps.acceptance.outcome }}
+          RETRY: ${{ steps.acceptance_retry.outcome }}
+        run: |
+          [[ "$FIRST" == success || "$RETRY" == success ]] || {
+            echo "::error::Android 16 PTY acceptance did not pass."
+            exit 1
+          }
+
+      - name: Upload instrumented results and emulator diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: dan-terminal-instrumented-test-reports
-          path: app/build/reports/androidTests/connected/
+          path: |
+            app/build/reports/androidTests/**
+            app/build/outputs/androidTest-results/**
+            ${{ runner.temp }}/dan-terminal-emulator-diagnostics/**
           if-no-files-found: warn
 
       - name: Upload test and lint reports
@@ -113,8 +161,9 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload debug APK
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dan-terminal-dev-debug
+          name: dan-terminal-dev-debug-unverified
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
