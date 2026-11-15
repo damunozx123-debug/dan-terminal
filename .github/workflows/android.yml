@@ -90,6 +90,14 @@ jobs:
           grep -Fq "application-label:'DAN Terminal Dev'" "$RUNNER_TEMP/dan-apk-badging.txt"
           grep -Fq "launchable-activity: name='com.dan.terminal.MainActivity'" "$RUNNER_TEMP/dan-apk-badging.txt"
 
+      - name: Retain debug APK before emulator acceptance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dan-terminal-dev-debug-unverified
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: warn
+
       - name: Run PTY acceptance test on Android 16 emulator
         id: acceptance
         continue-on-error: true
@@ -166,10 +174,3 @@ jobs:
             **/build/test-results/
           if-no-files-found: warn
 
-      - name: Upload debug APK
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dan-terminal-dev-debug-unverified
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
