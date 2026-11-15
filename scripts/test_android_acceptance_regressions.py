@@ -133,6 +133,25 @@ raise SystemExit(int(os.environ['TEST_EXIT']))
         self.assertTrue(r['parse_errors'])
         self.assertFalse(r['retry_classification'])
 
+    def test_negative_or_cancelling_suite_counters_never_pass(self):
+        for counters in ((-1, 1, 0), (1, -1, 0), (0, 1, -1), (0, 0, -1)):
+            with self.subTest(counters=counters), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                results = root / 'results'
+                results.mkdir()
+                expected = root / 'expected.txt'
+                expected.write_text('test.First#works\n')
+                log = root / 'gradle.log'
+                log.write_text('')
+                failures, errors, skipped = counters
+                (results / 'TEST-corrupt.xml').write_text(
+                    f'<testsuite tests="1" failures="{failures}" errors="{errors}" skipped="{skipped}">'
+                    '<testcase classname="test.First" name="works"/></testsuite>')
+                result = acceptance.verify(results, expected, log, 0)
+                self.assertNotEqual('passed', result['status'])
+                self.assertFalse(result['retry'])
+                self.assertTrue(result['parse_errors'])
+
     def test_unknown_gradle_failure_is_not_retried(self):
         self.assertFalse(self.run_fixture(test_exit=9, mode='unknown')['retry_classification'])
 

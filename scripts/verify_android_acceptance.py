@@ -45,7 +45,10 @@ def verify(results: Path, expected_file: Path, log_file: Path, gradle_exit: int)
             cases.extend(root.iter('testcase'))
             suite_problems += any(node.tag in ('failure', 'error', 'skipped') for node in root.iter())
             for suite in root.iter('testsuite'):
-                suite_problems += sum(int(suite.get(key, '0')) for key in ('failures', 'errors', 'skipped'))
+                counters = [int(suite.get(key, '0')) for key in ('failures', 'errors', 'skipped')]
+                if any(count < 0 for count in counters):
+                    parse_errors.append(f'{report.name}: negative failure/error/skip count')
+                suite_problems += any(count != 0 for count in counters)
                 if suite.get('tests') is not None and int(suite.get('tests')) != len(list(suite.iter('testcase'))):
                     parse_errors.append(f'{report.name}: declared testcase count does not match actual cases')
         except (ET.ParseError, ValueError) as error:
