@@ -4,12 +4,17 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Paint
+import android.graphics.Typeface
+import android.util.TypedValue
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
@@ -19,6 +24,7 @@ import com.dan.terminal.MainActivity
 import com.dan.terminal.feature.termux.PtyTerminalService
 import com.termux.terminal.TerminalSession
 import com.termux.view.TerminalView
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -26,6 +32,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.concurrent.TimeUnit
+import kotlin.math.roundToInt
 
 @RunWith(AndroidJUnit4::class)
 class TerminalViewAcceptanceTest {
@@ -90,6 +97,80 @@ class TerminalViewAcceptanceTest {
         scenario.onActivity { activity ->
             val terminal = checkNotNull(findTerminal(activity.window.decorView))
             assertTrue(terminal.currentSession.emulator.screen.transcriptText.contains("M3_MULTI_ONE=accepted"))
+        }
+    }
+
+    @Test fun defaultFontUsesScaledPixelsOnTheRealTerminalGrid() = withFontPreference(null) {
+        withTerminal { scenario -> assertFontColumns(scenario, 14) }
+    }
+
+    @Test fun fontControlsResizeSameShellAndPersistAcrossRecreationAndNavigation() = withFontPreference(null) {
+        withTerminal { scenario ->
+            var original: TerminalSession? = null
+            scenario.onActivity { activity -> original = findTerminal(activity.window.decorView)?.currentSession }
+            typeCommand(scenario, "stty -echo; PS1=''; export FONT_MARK=retained; printf '\\n%s=%s\\n' FONT_READY YES")
+            await(scenario) { it.currentSession.emulator.screen.transcriptText.contains("FONT_READY=YES") }
+            compose.onNodeWithContentDescription("Increase terminal text size").performClick()
+            compose.waitForIdle()
+            assertFontColumns(scenario, 16)
+            scenario.onActivity { activity -> assertSame(original, findTerminal(activity.window.decorView)?.currentSession) }
+            scenario.recreate()
+            await(scenario) { it.currentSession?.emulator != null }
+            assertFontColumns(scenario, 16)
+            compose.onNodeWithText("Setup").performClick()
+            compose.onNodeWithText("Open terminal console").performClick()
+            await(scenario) { it.currentSession?.emulator != null }
+            assertFontColumns(scenario, 16)
+            scenario.onActivity { activity -> assertSame(original, findTerminal(activity.window.decorView)?.currentSession) }
+            typeCommand(scenario, "printf '\\n%s=%s\\n' FONT_AFTER \"\$FONT_MARK\"")
+            await(scenario) { it.currentSession.emulator.screen.transcriptText.contains("FONT_AFTER=retained") }
+            compose.onNodeWithContentDescription("Decrease terminal text size").performClick()
+            compose.waitForIdle()
+            assertFontColumns(scenario, 14)
+        }
+    }
+
+    @Test fun fontControlsClampAtReadableMinimumAndMaximum() {
+        withFontPreference(10) {
+            withTerminal { scenario ->
+                compose.onNodeWithContentDescription("Decrease terminal text size").assertIsNotEnabled()
+                assertFontColumns(scenario, 10)
+            }
+        }
+        withFontPreference(28) {
+            withTerminal { scenario ->
+                compose.onNodeWithContentDescription("Increase terminal text size").assertIsNotEnabled()
+                assertFontColumns(scenario, 28)
+            }
+        }
+    }
+
+    private fun assertFontColumns(scenario: ActivityScenario<MainActivity>, sizeSp: Int) {
+        compose.waitForIdle()
+        scenario.onActivity { activity ->
+            val terminal = checkNotNull(findTerminal(activity.window.decorView))
+            val pixels = TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_SP, sizeSp.toFloat(), activity.resources.displayMetrics
+            ).roundToInt()
+            val paint = Paint().apply { typeface = Typeface.MONOSPACE; textSize = pixels.toFloat() }
+            val expectedColumns = (terminal.width / paint.measureText("X")).toInt().coerceAtLeast(4)
+            assertTrue("terminal must be laid out", terminal.width > 0)
+            assertEquals("terminal grid must match the chosen scaled font", expectedColumns,
+                terminal.currentSession.emulator.mColumns)
+        }
+    }
+
+    private fun withFontPreference(sizeSp: Int?, block: () -> Unit) {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val preferences = context.getSharedPreferences("dan_terminal_appearance", 0)
+        val old = preferences.all["font_size_sp"]
+        preferences.edit().apply {
+            if (sizeSp == null) remove("font_size_sp") else putInt("font_size_sp", sizeSp)
+        }.commit()
+        try { block() } finally {
+            preferences.edit().apply {
+                if (old is Int) putInt("font_size_sp", old) else remove("font_size_sp")
+            }.commit()
         }
     }
 

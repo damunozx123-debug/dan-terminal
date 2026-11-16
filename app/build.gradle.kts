@@ -39,6 +39,15 @@ android {
             applicationIdSuffix = ".dev"
             if (updateSigningEnabled) signingConfig = signingConfigs.getByName("obtainium")
         }
+        create("preview") {
+            initWith(getByName("debug"))
+            // A fresh install path for testers whose older Dev APK has an
+            // unrecoverable ephemeral CI signing key. Keep its private data intact.
+            applicationIdSuffix = ".preview"
+            versionNameSuffix = "-readable-preview"
+            matchingFallbacks += listOf("debug")
+            resValue("string", "app_name", "DAN Terminal Preview")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

@@ -75,7 +75,7 @@ jobs:
           if-no-files-found: error
 
       - name: Compile and unit test
-        run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest testDebugUnitTest lintDebug --continue --stacktrace --no-daemon
+        run: ./gradlew :app:assembleDebug :app:assemblePreview :app:assembleDebugAndroidTest testDebugUnitTest lintDebug --continue --stacktrace --no-daemon
 
       - name: Verify side-by-side development package
         shell: bash
@@ -89,6 +89,9 @@ jobs:
           grep -Fq "package: name='com.dan.terminal.dev' " "$RUNNER_TEMP/dan-apk-badging.txt"
           grep -Fq "application-label:'DAN Terminal Dev'" "$RUNNER_TEMP/dan-apk-badging.txt"
           grep -Fq "launchable-activity: name='com.dan.terminal.MainActivity'" "$RUNNER_TEMP/dan-apk-badging.txt"
+          "$AAPT" dump badging app/build/outputs/apk/preview/app-preview.apk > "$RUNNER_TEMP/dan-preview-badging.txt"
+          grep -Fq "package: name='com.dan.terminal.preview' " "$RUNNER_TEMP/dan-preview-badging.txt"
+          grep -Fq "application-label:'DAN Terminal Preview'" "$RUNNER_TEMP/dan-preview-badging.txt"
 
       - name: Retain debug APK before emulator acceptance
         if: always()
@@ -96,6 +99,14 @@ jobs:
         with:
           name: dan-terminal-dev-debug-unverified
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: warn
+
+      - name: Retain side-by-side Preview APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dan-terminal-preview-fonts-phone-unverified
+          path: app/build/outputs/apk/preview/app-preview.apk
           if-no-files-found: warn
 
       - name: Run PTY acceptance test on Android 16 emulator

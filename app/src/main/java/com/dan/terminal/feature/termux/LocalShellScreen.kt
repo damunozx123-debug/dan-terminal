@@ -30,10 +30,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontFamily
@@ -47,6 +51,18 @@ fun LocalShellScreen(
     onLegacyConsole: () -> Unit
 ) {
     val context = LocalContext.current.applicationContext
+    val appearance = remember(context) { context.getSharedPreferences("dan_terminal_appearance", 0) }
+    var fontSizeSp by remember(appearance) {
+        mutableIntStateOf(
+            ((appearance.all["font_size_sp"] as? Int) ?: DEFAULT_TERMINAL_FONT_SP)
+                .coerceIn(MIN_TERMINAL_FONT_SP, MAX_TERMINAL_FONT_SP)
+        )
+    }
+    val terminalTextSize = terminalFontSizePixels(fontSizeSp, LocalDensity.current)
+    fun changeFontSize(delta: Int) {
+        fontSizeSp = (fontSizeSp + delta).coerceIn(MIN_TERMINAL_FONT_SP, MAX_TERMINAL_FONT_SP)
+        appearance.edit().putInt("font_size_sp", fontSizeSp).apply()
+    }
     var binder by remember { mutableStateOf<PtyTerminalService.LocalBinder?>(null) }
     var serviceError by remember { mutableStateOf<String?>(null) }
     val connection = remember(context) {
@@ -91,6 +107,24 @@ fun LocalShellScreen(
             "App sandbox · PTY session · Android UID",
             style = MaterialTheme.typography.labelSmall
         )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        ) {
+            Text("Text size", style = MaterialTheme.typography.labelMedium)
+            TextButton(
+                onClick = { changeFontSize(-2) },
+                enabled = fontSizeSp > MIN_TERMINAL_FONT_SP,
+                modifier = Modifier.semantics { contentDescription = "Decrease terminal text size" }
+            ) { Text("A−") }
+            Text(fontSizeSp.toString(), style = MaterialTheme.typography.labelMedium)
+            TextButton(
+                onClick = { changeFontSize(2) },
+                enabled = fontSizeSp < MAX_TERMINAL_FONT_SP,
+                modifier = Modifier.semantics { contentDescription = "Increase terminal text size" }
+            ) { Text("A+") }
+        }
         if (session != null) {
             if (!session.isRunning) {
                 Row {
@@ -122,7 +156,8 @@ fun LocalShellScreen(
                     factory = { viewContext ->
                         TerminalView(viewContext, null).apply {
                             setBackgroundColor(Color.rgb(16, 19, 24))
-                            setTextSize(16)
+                            setTextSize(terminalTextSize)
+                            tag = terminalTextSize
                             contentDescription = "Interactive terminal"
                             isFocusableInTouchMode = true
                             setTerminalViewClient(PtyTerminalViewClient(this))
@@ -131,6 +166,13 @@ fun LocalShellScreen(
                         }
                     },
                     update = { view ->
+                        // PTY output also triggers this callback. Only rebuild the
+                        // renderer and resize the grid when the font actually changes.
+                        if (view.tag != terminalTextSize) {
+                            view.setTextSize(terminalTextSize)
+                            view.tag = terminalTextSize
+                            view.invalidate()
+                        }
                         view.attachSession(session)
                         if (revision != null) view.onScreenUpdated()
                     }

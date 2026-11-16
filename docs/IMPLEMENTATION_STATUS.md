@@ -1,3 +1,8 @@
+> 16 November readability update: [terminal text and Preview build](TERMINAL_READABILITY_2026_11_16.md).
+> Local assembly, all 69 JVM tests and lint passed. Android UI and new Redmi-font
+> acceptance remain pending. Existing phone observations are recorded in
+> [REDMI_M3_ACCEPTANCE.md](REDMI_M3_ACCEPTANCE.md).
+
 # Implementation status — 15 November 2026
 
 DAN Terminal is progressing through M3 terminal work and selected M4–M6
