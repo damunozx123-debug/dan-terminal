@@ -22,6 +22,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate source tree
         run: python3 scripts/validate_source_tree.py
+      - name: Test source checker after generated build output
+        run: python3 -m unittest -v scripts/test_validate_source_tree.py
       - name: Check bootstrap script
         run: bash -n scripts/bootstrap_gradle_wrapper.sh scripts/run_android_acceptance.sh scripts/verify_release_candidate.sh app/src/main/assets/bootstrap/dan_bootstrap.sh
       - name: Test bootstrap success and failure
