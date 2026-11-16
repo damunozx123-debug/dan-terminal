@@ -252,7 +252,7 @@ class TerminalViewAcceptanceTest {
             ).joinToString("; ")
         }
         val semantics = runCatching {
-            compose.onRoot(useUnmergedTree = true).printToString().take(2400)
+            compose.onRoot(useUnmergedTree = true).fetchSemanticsNode().toString().take(2400)
         }.getOrElse { "Unavailable: ${it.javaClass.simpleName}: ${it.message}" }
         throw AssertionError(
             "Terminal view did not reach expected state through Android input. " +
