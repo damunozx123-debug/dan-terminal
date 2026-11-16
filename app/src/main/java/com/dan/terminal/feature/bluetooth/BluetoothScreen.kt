@@ -90,7 +90,7 @@ fun BluetoothScreen(onDeviceSelected: (BleDevice) -> Unit) {
     ) {
         Text("Bluetooth / BLE", style = MaterialTheme.typography.headlineMedium)
         Text(
-            "Native Android BLE scan. Tap a device to inspect GATT services.",
+            "Nearby BLE advertisements. Tap a connectable device to discover its GATT services.",
             style = MaterialTheme.typography.bodySmall
         )
         Button(
@@ -119,9 +119,9 @@ fun BluetoothScreen(onDeviceSelected: (BleDevice) -> Unit) {
                         Text(device.displayName, style = MaterialTheme.typography.titleMedium)
                         Text(device.address)
                         Text("RSSI: ${device.rssi} dBm")
-                        if (!device.isConnectable) Text("Broadcast only — no GATT connection")
+                        Text(if (device.isConnectable) "Connectable · tap for GATT" else "Broadcast only — no GATT connection")
                         if (device.serviceUuids.isNotEmpty()) {
-                            Text("Services: ${device.serviceUuids.size}")
+                            Text("Advertised service UUIDs: ${device.serviceUuids.size} (not GATT discovery)")
                         }
                         if (device.manufacturerData.isNotEmpty()) {
                             Text("Manufacturer data: ${device.manufacturerData.size} entries")
