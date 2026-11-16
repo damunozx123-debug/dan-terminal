@@ -84,7 +84,11 @@ class PtyTerminalServiceTest {
 
         // Exercise reflow while the output queue is active. Only the main thread
         // may mutate/read emulator state, just as TerminalView does in production.
-        send(session, "i=0; while [ \$i -lt 100 ]; do printf '%080dX\\n' 0; i=\$((i+1)); done; printf '\\n%s=%s\\n' M3_REFLOW OK")
+        // Confirm the shell accepted the complete command before resizing.
+        // Otherwise resize can race command input, masking the output-reflow check.
+        // A short delay per output line keeps resize and rendering genuinely concurrent.
+        send(session, "printf '\\n%s=%s\\n' M3_REFLOW START; i=0; while [ \$i -lt 100 ]; do printf '%080dX\\n' 0; sleep 0.02; i=\$((i+1)); done; printf '\\n%s=%s\\n' M3_REFLOW OK")
+        awaitText(session, "M3_REFLOW=START")
         repeat(10) {
             resizeOnMainThread(session, columns = 100, rows = 40)
             resizeOnMainThread(session, columns = 80, rows = 24)
