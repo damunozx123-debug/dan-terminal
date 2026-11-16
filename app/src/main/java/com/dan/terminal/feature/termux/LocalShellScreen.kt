@@ -101,10 +101,10 @@ fun LocalShellScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("DAN Terminal", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
             TextButton(onClick = onSettings) { Text("Setup") }
-            TextButton(onClick = onLegacyConsole) { Text("Termux") }
+            TextButton(onClick = onLegacyConsole) { Text("Termux commands") }
         }
         Text(
-            "App sandbox · PTY session · Android UID",
+            "Android /system/bin/sh · no apt/pkg here. Use Termux commands for separate Termux jobs.",
             style = MaterialTheme.typography.labelSmall
         )
         Row(
