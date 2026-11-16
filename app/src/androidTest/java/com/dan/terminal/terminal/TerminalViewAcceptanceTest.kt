@@ -222,7 +222,35 @@ class TerminalViewAcceptanceTest {
             if (matched) return
             Thread.sleep(50)
         }
-        throw AssertionError("Terminal view did not reach expected state through Android input")
+        // Capture what actually mounted, instead of hiding six distinct readiness
+        // failures behind the same timeout message. No extra waiting or skipped tests.
+        var diagnostic = "Activity unavailable"
+        scenario.onActivity { activity ->
+            val root = activity.window.decorView
+            val terminal = findTerminal(root)
+            val setup = activity.getSharedPreferences("dan_terminal_setup", 0)
+                .getBoolean("setup_completed", false)
+            val nodes = mutableListOf<String>()
+            fun walk(node: View) {
+                if (nodes.size >= 24) return
+                nodes.add(node.javaClass.simpleName + "(" + node.width + "x" + node.height + ")")
+                if (node is ViewGroup) {
+                    for (index in 0 until node.childCount) walk(node.getChildAt(index))
+                }
+            }
+            walk(root)
+            diagnostic = listOf(
+                "setupCompleted=" + setup,
+                "terminalMounted=" + (terminal != null),
+                "terminalShown=" + (terminal?.isShown ?: false),
+                "terminalSize=" + (terminal?.width ?: -1) + "x" + (terminal?.height ?: -1),
+                "sessionAttached=" + (terminal?.currentSession != null),
+                "emulatorReady=" + (terminal?.currentSession?.emulator != null),
+                "shellRunning=" + (terminal?.currentSession?.isRunning ?: false),
+                "viewTree=" + nodes.joinToString(" > ")
+            ).joinToString("; ")
+        }
+        throw AssertionError("Terminal view did not reach expected state through Android input. " + diagnostic)
     }
 
     private fun findTerminal(view: View): TerminalView? {
