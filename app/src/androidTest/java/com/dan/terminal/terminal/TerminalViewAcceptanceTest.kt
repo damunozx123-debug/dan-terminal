@@ -16,6 +16,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -250,7 +251,13 @@ class TerminalViewAcceptanceTest {
                 "viewTree=" + nodes.joinToString(" > ")
             ).joinToString("; ")
         }
-        throw AssertionError("Terminal view did not reach expected state through Android input. " + diagnostic)
+        val semantics = runCatching {
+            compose.onRoot(useUnmergedTree = true).printToString().take(2400)
+        }.getOrElse { "Unavailable: ${it.javaClass.simpleName}: ${it.message}" }
+        throw AssertionError(
+            "Terminal view did not reach expected state through Android input. " +
+                diagnostic + "; composeSemantics=" + semantics
+        )
     }
 
     private fun findTerminal(view: View): TerminalView? {
