@@ -61,3 +61,25 @@ screen recording for failures and note the exact steps that reproduce them.
   shell state but do not explicitly document leaving and reopening the screen.
 - A font-size correction is in development. None of the observations above
   verifies its newer APK, Ctrl+C, background survival or release signing.
+
+## Screenshot observations — 17 November 2026
+
+The user provided two additional screenshots from the development application:
+
+- The local-shell screen shows a live prompt under `/data/data/com.dan.terminal.dev/files`.
+  `nmap`, `pkg`, `apt` and `update` report inaccessible/not found. This is
+  consistent with the app-owned Android `/system/bin/sh` backend and its
+  `/system/bin:/system/xbin` PATH; it is **not** a failing Termux package
+  installation or a missing root permission. Linux profile/package management
+  in the app-owned PTY remains **NOT IMPLEMENTED**.
+- The shell screenshot does not show the A−/A+ font controls present on the
+  newer M3 feature branch. Installed APK version/hash are still unknown, so
+  treat it as an older-UI observation rather than proof that the font fix
+  failed on the device.
+- The BLE screenshot shows advertisements, RSSI and broadcast-only indicators.
+  It does not show a completed connectable GATT service discovery or
+  characteristic read. Those acceptance checks remain **NOT TESTED**.
+
+The subsequent small UI patch clarifies Android-shell versus Termux-command
+scope and advertised UUIDs versus GATT discovery. Source review alone does not
+establish that a new APK was built or installed.
