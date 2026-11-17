@@ -48,7 +48,8 @@ import com.termux.view.TerminalViewClient
 @Composable
 fun LocalShellScreen(
     onSettings: () -> Unit,
-    onLegacyConsole: () -> Unit
+    onLegacyConsole: () -> Unit,
+    onReports: () -> Unit
 ) {
     val context = LocalContext.current.applicationContext
     val appearance = remember(context) { context.getSharedPreferences("dan_terminal_appearance", 0) }
@@ -102,6 +103,7 @@ fun LocalShellScreen(
             Text("DAN Terminal", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
             TextButton(onClick = onSettings) { Text("Setup") }
             TextButton(onClick = onLegacyConsole) { Text("Termux") }
+            TextButton(onClick = onReports) { Text("Reports") }
         }
         Text(
             "App sandbox · PTY session · Android UID",
