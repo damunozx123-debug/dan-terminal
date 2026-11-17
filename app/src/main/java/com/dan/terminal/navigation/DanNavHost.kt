@@ -116,7 +116,8 @@ fun DanNavHost(incomingReportUri: StateFlow<Uri?>, onReportConsumed: () -> Unit)
         composable("shell") {
             LocalShellScreen(
                 onSettings = { navController.navigate("home") },
-                onLegacyConsole = { navController.navigate("console") }
+                onLegacyConsole = { navController.navigate("console") },
+                onReports = { reportUri = null; navController.navigate("reports") }
             )
         }
         composable("console") {
