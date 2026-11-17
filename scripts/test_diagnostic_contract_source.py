@@ -141,7 +141,8 @@ else:
 source = (ROOT / "app/src/main/java/com/dan/terminal/feature/reports/DiagnosticReportImporter.kt").read_text()
 assert "enforceStrictJsonAndUniqueKeys" in source
 assert "Duplicate JSON field" in source
-assert 'val output = File(dir, "${preview.id}.json")' in source
+assert 'val validated = parseValidatedBytes(preview.bytes)' in source
+assert 'val output = File(dir, "${validated.id}.json")' in source
 assert "Only shared content:// reports are accepted" in source
 assert f'const val MIME = "{MIME}"' in source
 assert "Report URI is unavailable or permission expired" in source
