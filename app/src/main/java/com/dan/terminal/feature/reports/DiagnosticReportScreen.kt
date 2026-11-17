@@ -86,11 +86,12 @@ fun DiagnosticReportScreen(incomingUri: Uri?, onBack: () -> Unit) {
             for (i in 0 until measurements.length()) {
                 val m = measurements.getJSONObject(i)
                 val status = m.getString("status")
-                Text(
-                    m.getString("label") + ": " +
-                        if (status == "MEASURED") "${m.getDouble("value")} ${m.getString("unit")} (${m.getString("method")})"
-                        else "$status / ${m.getString("reason_code")}"
-                )
+                val valueText = if (status == "MEASURED") {
+                    "${m.getDouble("value")} ${m.getString("unit")} (${m.getString("method")})"
+                } else {
+                    "$status / ${m.getString("reason_code")}"
+                }
+                Text("${m.getString("label")}: $valueText")
             }
             val findings = report.getJSONArray("findings")
             if (findings.length() > 0) Text("Findings (heuristic observations)", style = MaterialTheme.typography.titleMedium)
