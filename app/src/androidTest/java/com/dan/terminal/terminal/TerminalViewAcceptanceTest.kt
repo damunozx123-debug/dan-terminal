@@ -40,31 +40,62 @@ class TerminalViewAcceptanceTest {
     @get:Rule val compose = createEmptyComposeRule()
 
     @Test fun completedSetupOpensTerminalImeInputAndActivityRecreationKeepShellState() {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val context = instrumentation.targetContext
-        val preferences = context.getSharedPreferences("dan_terminal_setup", 0)
-        val oldSetup = preferences.getBoolean("setup_completed", false)
-        preferences.edit().putBoolean("setup_completed", true).commit()
-        context.stopService(Intent(context, PtyTerminalService::class.java))
-        instrumentation.waitForIdleSync()
-        try {
-            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-                await(scenario) { it.currentSession?.emulator != null }
-                var original: TerminalSession? = null
-                scenario.onActivity { activity -> original = findTerminal(activity.window.decorView)?.currentSession }
-                typeCommand(scenario, "cd \"\$HOME\"; export M3_VIEW_MARK=retained; printf '\\n%s=%s\\n' M3_VIEW READY")
-                await(scenario) { it.currentSession.emulator.screen.transcriptText.contains("M3_VIEW=READY") }
-                scenario.recreate()
-                await(scenario) { it.currentSession?.emulator != null }
-                scenario.onActivity { activity -> assertSame(original, findTerminal(activity.window.decorView)?.currentSession) }
-                typeCommand(scenario, "printf '\\n%s=%s\\n' M3_RECREATED \"\$M3_VIEW_MARK\"")
-                await(scenario) { it.currentSession.emulator.screen.transcriptText.contains("M3_RECREATED=retained") }
-                assertTrue(preferences.getBoolean("setup_completed", false))
+        withTerminal { scenario ->
+            val instrumentation = InstrumentationRegistry.getInstrumentation()
+            var original: TerminalSession? = null
+            scenario.onActivity { activity ->
+                original = checkNotNull(findTerminal(activity.window.decorView)).currentSession
             }
-        } finally {
-            context.stopService(Intent(context, PtyTerminalService::class.java))
-            preferences.edit().putBoolean("setup_completed", oldSetup).commit()
+            val retained = checkNotNull(original)
+            typeCommand(scenario, "cd /system; export M3_VIEW_MARK=retained; export M3_VIEW_PID=\$\$; printf '\\n%s=%s\\n' M3_VIEW READY")
+            await(scenario) { it.currentSession.emulator.screen.transcriptText.contains("M3_VIEW=READY") }
+
+            // Leaving this route disposes LocalShellScreen's service binding.
+            // The started service, rather than a mounted view, must own the PTY.
+            compose.onNodeWithText("Setup").performClick()
+            compose.waitForIdle()
+            scenario.onActivity { activity ->
+                assertTrue("terminal view must be detached in Setup",
+                    findTerminal(activity.window.decorView) == null)
+            }
+            instrumentation.runOnMainSync {
+                assertTrue("started service must retain a live shell", retained.isRunning)
+                // Send only after detaching. A marker assembled by printf cannot
+                // be satisfied by the echoed command text.
+                retained.write("test \"\$\$\" = \"\$M3_VIEW_PID\" && test \"\$PWD\" = /system && test \"\$M3_VIEW_MARK\" = retained && printf '\\n%s=%s\\n' M3_DETACHED retained\n")
+            }
+            awaitSessionText(retained, "M3_DETACHED=retained")
+            compose.onNodeWithText("Open terminal console").performClick()
+            await(scenario) { it.currentSession?.emulator != null }
+            scenario.onActivity { activity ->
+                val terminal = checkNotNull(findTerminal(activity.window.decorView))
+                assertSame("navigation must reattach the same PTY", retained, terminal.currentSession)
+                assertTrue(terminal.currentSession.emulator.screen.transcriptText.contains("M3_DETACHED=retained"))
+            }
+
+            scenario.recreate()
+            await(scenario) { it.currentSession?.emulator != null }
+            scenario.onActivity { activity ->
+                assertSame("activity recreation must retain the PTY", retained,
+                    checkNotNull(findTerminal(activity.window.decorView)).currentSession)
+            }
+            typeCommand(scenario, "test \"\$\$\" = \"\$M3_VIEW_PID\" && test \"\$PWD\" = /system && printf '\\n%s=%s\\n' M3_RECREATED \"\$M3_VIEW_MARK\"")
+            await(scenario) { it.currentSession.emulator.screen.transcriptText.contains("M3_RECREATED=retained") }
         }
+    }
+
+    private fun awaitSessionText(session: TerminalSession, expected: String) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(12)
+        var transcript = ""
+        while (System.nanoTime() < deadline) {
+            instrumentation.runOnMainSync {
+                transcript = session.emulator.screen.transcriptText
+            }
+            if (transcript.contains(expected)) return
+            Thread.sleep(50)
+        }
+        throw AssertionError("Detached PTY did not produce '$expected'. Transcript: $transcript")
     }
 
     @Test fun clipboardPastePreservesUnicodeWithoutSubmittingUntilEnter() = withTerminal { scenario ->
