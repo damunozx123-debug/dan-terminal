@@ -10,7 +10,6 @@ import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
 import java.time.Instant
 
 /**
@@ -160,7 +159,7 @@ object DiagnosticReportImporter {
             if (quoted) {
                 when {
                     escaped -> escaped = false
-                    char == '\\\\' -> escaped = true
+                    char == '\\' -> escaped = true
                     char == '"' -> quoted = false
                 }
             } else when (char) {
