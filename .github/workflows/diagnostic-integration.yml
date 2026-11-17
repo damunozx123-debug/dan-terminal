@@ -1,0 +1,61 @@
+name: G2 Diagnostics Contract and Android Build (no emulator)
+on:
+  push:
+    branches:
+      - feature/diagnostic-report-v1-import-20261117
+  pull_request:
+    branches:
+      - feature/m2-termux-command-console
+
+permissions:
+  contents: read
+
+concurrency:
+  group: diagnostic-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install JSON schema validator
+        run: python -m pip install 'jsonschema>=4.23,<5'
+      - name: Check pinned schema and synthetic contract fixtures
+        run: python scripts/test_diagnostic_contract_source.py
+      - name: Check source whitespace
+        run: git diff --check
+
+  android-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: contract-source
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - uses: android-actions/setup-android@v4
+      - name: Install compile SDK
+        run: sdkmanager --install 'platforms;android-36' 'build-tools;35.0.0'
+      - name: Validate/generate Gradle wrapper
+        run: bash scripts/bootstrap_gradle_wrapper.sh
+      - name: Compile, unit test and lint without emulator or physical phone
+        run: ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --no-daemon --stacktrace
+      - name: Keep test/lint reports only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: g2-build-reports
+          path: |
+            **/build/reports/
+            **/build/test-results/
+          if-no-files-found: warn
