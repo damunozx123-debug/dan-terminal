@@ -189,7 +189,7 @@ object DiagnosticReportImporter {
     fun openImported(context: Context, reportId: String): Preview {
         require(uuid.matches(reportId)) { "Invalid report ID" }
         val file = File(File(context.filesDir, "imported_diagnostics"), "$reportId.json")
-        require(file.isFile && file.length() in 1..MAX_BYTES.toLong()) { "Saved report unavailable" }
+        require(file.isFile && file.length() in 1L..MAX_BYTES.toLong()) { "Saved report unavailable" }
         return parseValidatedBytes(file.readBytes())
     }
 
@@ -210,7 +210,7 @@ object DiagnosticReportImporter {
             if (output.readBytes().contentEquals(preview.bytes)) return "Already imported (identical)"
             throw IllegalArgumentException("Report ID exists with different content")
         }
-        require(dir.listFiles()?.size ?: 0 < 100) { "Report storage limit reached" }
+        require((dir.listFiles()?.size ?: 0) < 100) { "Report storage limit reached" }
         val tmp = File.createTempFile("incoming-", ".tmp", dir)
         try {
             FileOutputStream(tmp).use { stream ->
