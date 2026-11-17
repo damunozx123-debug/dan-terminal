@@ -91,16 +91,11 @@ jobs:
           avd-name: dan-g2-diagnostic
           emulator-boot-timeout: 900
           disable-animations: true
-          script: |
-            set -euo pipefail
-            adb install -r app/build/outputs/apk/debug/app-debug.apk
-            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-            adb shell am instrument -w -r -e class com.dan.terminal.reports.DiagnosticReportImporterTest com.dan.terminal.dev.test/androidx.test.runner.AndroidJUnitRunner | tee "$RUNNER_TEMP/diagnostic-instrumentation.txt"
-            grep -Fq 'OK (6 tests)' "$RUNNER_TEMP/diagnostic-instrumentation.txt"
+          script: bash scripts/run_diagnostic_instrumentation.sh
       - name: Retain diagnostic runtime result
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: g2-diagnostic-emulator-evidence
-          path: ${{ runner.temp }}/diagnostic-instrumentation.txt
+          path: ${{ runner.temp }}/g2-diagnostic-emulator/**
           if-no-files-found: warn
