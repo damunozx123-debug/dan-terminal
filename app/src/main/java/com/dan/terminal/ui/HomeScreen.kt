@@ -22,7 +22,8 @@ fun HomeScreen(
     onShizuku: () -> Unit,
     onTermux: () -> Unit,
     onConsole: () -> Unit,
-    onNetworkDiagnostics: () -> Unit
+    onNetworkDiagnostics: () -> Unit,
+    onReports: () -> Unit
 ) {
     val container = LocalAppContainer.current
     val shizuku by container.shizukuManager.state.collectAsState()
@@ -57,6 +58,9 @@ fun HomeScreen(
         }
         Button(onClick = onNetworkDiagnostics, modifier = Modifier.fillMaxWidth()) {
             Text("Connectivity diagnostics")
+        }
+        Button(onClick = onReports, modifier = Modifier.fillMaxWidth()) {
+            Text("Import / view diagnostic report")
         }
         Button(onClick = onShizuku, modifier = Modifier.fillMaxWidth()) {
             Text("Shizuku privilege broker")
