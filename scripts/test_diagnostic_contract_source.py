@@ -15,7 +15,7 @@ MAX_BYTES = 65_536
 
 
 def git_blob_sha(raw):
-    return hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\\0" + raw).hexdigest()
+    return hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + bytes([0]) + raw).hexdigest()
 
 
 schema_bytes = SCHEMA_PATH.read_bytes()
