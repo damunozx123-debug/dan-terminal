@@ -51,8 +51,11 @@ object DiagnosticReportImporter {
                 data.write(buffer, 0, n)
             }
         } ?: throw IllegalArgumentException("Report URI is unavailable or permission expired")
-        val bytes = data.toByteArray()
-        require(bytes.isNotEmpty()) { "Empty report" }
+        return parseValidatedBytes(data.toByteArray())
+    }
+
+    private fun parseValidatedBytes(bytes: ByteArray): Preview {
+        require(bytes.isNotEmpty() && bytes.size <= MAX_BYTES) { "Empty or oversized report" }
         val text = StandardCharsets.UTF_8.newDecoder()
             .onMalformedInput(CodingErrorAction.REPORT)
             .onUnmappableCharacter(CodingErrorAction.REPORT)
@@ -170,6 +173,31 @@ object DiagnosticReportImporter {
             require(depth >= 0) { "Malformed report JSON" }
         }
         require(depth == 0 && !quoted) { "Malformed report JSON" }
+    }
+
+    /** Only canonical UUID filenames are ever opened or deleted from private storage. */
+    fun listImportedIds(context: Context): List<String> {
+        val dir = File(context.filesDir, "imported_diagnostics")
+        return dir.listFiles().orEmpty()
+            .filter { it.isFile && it.name.endsWith(".json") &&
+                uuid.matches(it.name.removeSuffix(".json")) }
+            .sortedByDescending { it.lastModified() }
+            .take(100)
+            .map { it.name.removeSuffix(".json") }
+    }
+
+    fun openImported(context: Context, reportId: String): Preview {
+        require(uuid.matches(reportId)) { "Invalid report ID" }
+        val file = File(File(context.filesDir, "imported_diagnostics"), "$reportId.json")
+        require(file.isFile && file.length() in 1..MAX_BYTES.toLong()) { "Saved report unavailable" }
+        return parseValidatedBytes(file.readBytes())
+    }
+
+    @Synchronized
+    fun deleteImported(context: Context, reportId: String): Boolean {
+        require(uuid.matches(reportId)) { "Invalid report ID" }
+        val file = File(File(context.filesDir, "imported_diagnostics"), "$reportId.json")
+        return !file.exists() || file.delete()
     }
 
     /** Idempotent app-private import. No API endpoint or shared database. */
