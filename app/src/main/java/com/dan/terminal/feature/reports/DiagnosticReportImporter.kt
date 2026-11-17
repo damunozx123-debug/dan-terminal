@@ -224,9 +224,13 @@ object DiagnosticReportImporter {
     /** Idempotent app-private import. No API endpoint or shared database. */
     @Synchronized
     fun import(context: Context, preview: Preview): String {
+        // A UI preview holds a mutable JSONObject; never trust it at commit time.
+        // Validate the exact bytes we will persist and bind the storage key to those bytes.
+        val validated = parseValidatedBytes(preview.bytes)
+        require(validated.id == preview.id) { "Report identity changed after preview" }
         val dir = File(context.filesDir, "imported_diagnostics")
         require(dir.isDirectory || dir.mkdirs()) { "Cannot create import directory" }
-        val output = File(dir, "${preview.id}.json")
+        val output = File(dir, "${validated.id}.json")
         if (output.exists()) {
             if (output.readBytes().contentEquals(preview.bytes)) return "Already imported (identical)"
             throw IllegalArgumentException("Report ID exists with different content")
