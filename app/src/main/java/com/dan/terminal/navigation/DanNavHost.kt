@@ -1,6 +1,9 @@
 package com.dan.terminal.navigation
 
 import androidx.compose.runtime.Composable
+import android.net.Uri
+import kotlinx.coroutines.flow.StateFlow
+import com.dan.terminal.feature.reports.DiagnosticReportScreen
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -25,8 +28,17 @@ import com.dan.terminal.feature.termux.LocalShellScreen
 import com.dan.terminal.ui.HomeScreen
 
 @Composable
-fun DanNavHost() {
+fun DanNavHost(incomingReportUri: StateFlow<Uri?>, onReportConsumed: () -> Unit) {
     val navController = rememberNavController()
+    val incoming by incomingReportUri.collectAsState()
+    var reportUri by remember { mutableStateOf<Uri?>(null) }
+    LaunchedEffect(incoming) {
+        if (incoming != null) {
+            reportUri = incoming
+            navController.navigate("reports") { launchSingleTop = true }
+            onReportConsumed()
+        }
+    }
     val context = LocalContext.current
     val preferences = remember(context) { context.getSharedPreferences("dan_terminal_setup", 0) }
     val initialRoute = remember(preferences) {
@@ -68,6 +80,7 @@ fun DanNavHost() {
                 onShizuku = { navController.navigate("shizuku") },
                 onTermux = { navController.navigate("termux") },
                 onNetworkDiagnostics = { navController.navigate("network") },
+                onReports = { reportUri = null; navController.navigate("reports") },
                 onConsole = {
                     preferences.edit().putBoolean("setup_completed", true).apply()
                     navController.navigate("shell") {
@@ -94,6 +107,12 @@ fun DanNavHost() {
         composable("shizuku") { ShizukuScreen() }
         composable("termux") { TermuxScreen() }
         composable("network") { NetworkDiagnosticsScreen(onBack = { navController.popBackStack() }) }
+        composable("reports") {
+            DiagnosticReportScreen(
+                incomingUri = reportUri,
+                onBack = { navController.popBackStack() }
+            )
+        }
         composable("shell") {
             LocalShellScreen(
                 onSettings = { navController.navigate("home") },
