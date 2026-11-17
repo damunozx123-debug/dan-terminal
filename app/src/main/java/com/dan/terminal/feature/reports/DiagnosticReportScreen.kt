@@ -5,11 +5,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +41,8 @@ fun DiagnosticReportScreen(incomingUri: Uri?, onBack: () -> Unit) {
     var error by remember(selectedUri) { mutableStateOf<String?>(null) }
     var notice by remember(selectedUri) { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
+    var savedIds by remember(context) { mutableStateOf(DiagnosticReportImporter.listImportedIds(context)) }
+    var pendingDeletion by remember { mutableStateOf<String?>(null) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         selectedUri = uri
     }
@@ -66,6 +70,25 @@ fun DiagnosticReportScreen(incomingUri: Uri?, onBack: () -> Unit) {
             onClick = { picker.launch(arrayOf(DiagnosticReportImporter.MIME, "application/json")) },
             modifier = Modifier.fillMaxWidth()
         ) { Text("Choose report file") }
+        Text("Saved private reports: ${savedIds.size}", style = MaterialTheme.typography.titleMedium)
+        for (id in savedIds.take(20)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                TextButton(onClick = {
+                    scope.launch {
+                        try {
+                            preview = withContext(Dispatchers.IO) {
+                                DiagnosticReportImporter.openImported(context.applicationContext, id)
+                            }
+                            error = null
+                            notice = "Saved report loaded locally — authorship still unverified"
+                        } catch (failure: Exception) {
+                            error = failure.message ?: "Cannot open saved report"
+                        }
+                    }
+                }) { Text(id.take(8) + "…") }
+                TextButton(onClick = { pendingDeletion = id }) { Text("Delete") }
+            }
+        }
         error?.let { Text("Import blocked: $it", color = MaterialTheme.colorScheme.error) }
         notice?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
         preview?.let { item ->
@@ -115,6 +138,8 @@ fun DiagnosticReportScreen(incomingUri: Uri?, onBack: () -> Unit) {
                         try {
                             notice = withContext(Dispatchers.IO) {
                                 DiagnosticReportImporter.import(context.applicationContext, item)
+                            }.also {
+                                savedIds = DiagnosticReportImporter.listImportedIds(context)
                             }
                         } catch (failure: Exception) {
                             error = failure.message ?: "Import failed"
@@ -126,5 +151,32 @@ fun DiagnosticReportScreen(incomingUri: Uri?, onBack: () -> Unit) {
             ) { Text("Confirm import to DAN Terminal") }
         }
         TextButton(onClick = onBack) { Text("Back") }
+    }
+    pendingDeletion?.let { id ->
+        AlertDialog(
+            onDismissRequest = { pendingDeletion = null },
+            title = { Text("Delete stored diagnostic?") },
+            text = { Text("This permanently removes the selected imported report from DAN Terminal.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingDeletion = null
+                    scope.launch {
+                        try {
+                            withContext(Dispatchers.IO) {
+                                check(DiagnosticReportImporter.deleteImported(context.applicationContext, id))
+                            }
+                            if (preview?.id == id) preview = null
+                            savedIds = DiagnosticReportImporter.listImportedIds(context)
+                            notice = "Saved report deleted"
+                        } catch (failure: Exception) {
+                            error = failure.message ?: "Could not delete saved report"
+                        }
+                    }
+                }) { Text("Delete report") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeletion = null }) { Text("Cancel") }
+            }
+        )
     }
 }
