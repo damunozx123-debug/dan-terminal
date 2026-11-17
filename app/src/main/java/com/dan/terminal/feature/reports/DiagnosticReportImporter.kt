@@ -2,11 +2,14 @@ package com.dan.terminal.feature.reports
 
 import android.content.Context
 import android.net.Uri
+import android.util.JsonReader
+import android.util.JsonToken
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.StringReader
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
@@ -60,7 +63,7 @@ object DiagnosticReportImporter {
             .onMalformedInput(CodingErrorAction.REPORT)
             .onUnmappableCharacter(CodingErrorAction.REPORT)
             .decode(ByteBuffer.wrap(bytes)).toString()
-        enforceNestingDepth(text)
+        enforceStrictJsonAndUniqueKeys(text)
         val report = JSONObject(text)
         validate(report)
         return Preview(report, bytes)
@@ -153,26 +156,44 @@ object DiagnosticReportImporter {
         }
     }
 
-    /** Reject excessive nesting before invoking JSONObject's recursive parser. */
-    private fun enforceNestingDepth(text: String) {
-        var depth = 0
-        var quoted = false
-        var escaped = false
-        for (char in text) {
-            if (quoted) {
-                when {
-                    escaped -> escaped = false
-                    char == '\\' -> escaped = true
-                    char == '"' -> quoted = false
+    /**
+     * Parse once with Android's strict streaming reader before JSONObject.
+     * Reject duplicate object keys (including escaped equivalents), comments,
+     * malformed JSON and excessive depth before materializing the report tree.
+     */
+    private fun enforceStrictJsonAndUniqueKeys(text: String) {
+        JsonReader(StringReader(text)).use { reader ->
+            reader.isLenient = false
+
+            fun readValue(depth: Int) {
+                when (reader.peek()) {
+                    JsonToken.BEGIN_OBJECT -> {
+                        require(depth < 16) { "Report nesting exceeds limit" }
+                        reader.beginObject()
+                        val names = mutableSetOf<String>()
+                        while (reader.hasNext()) {
+                            val name = reader.nextName()
+                            require(names.add(name)) { "Duplicate JSON field" }
+                            readValue(depth + 1)
+                        }
+                        reader.endObject()
+                    }
+                    JsonToken.BEGIN_ARRAY -> {
+                        require(depth < 16) { "Report nesting exceeds limit" }
+                        reader.beginArray()
+                        while (reader.hasNext()) readValue(depth + 1)
+                        reader.endArray()
+                    }
+                    JsonToken.STRING, JsonToken.NUMBER -> reader.nextString()
+                    JsonToken.BOOLEAN -> reader.nextBoolean()
+                    JsonToken.NULL -> reader.nextNull()
+                    else -> throw IllegalArgumentException("Malformed diagnostic JSON")
                 }
-            } else when (char) {
-                '"' -> quoted = true
-                '{', '[' -> { depth++; require(depth <= 16) { "Report nesting exceeds limit" } }
-                '}', ']' -> depth--
             }
-            require(depth >= 0) { "Malformed report JSON" }
+
+            readValue(0)
+            require(reader.peek() == JsonToken.END_DOCUMENT) { "Trailing JSON data" }
         }
-        require(depth == 0 && !quoted) { "Malformed report JSON" }
     }
 
     /** Only canonical UUID filenames are ever opened or deleted from private storage. */
