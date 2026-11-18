@@ -1,0 +1,8 @@
+[Unit]
+Description=Read-only DAN Android lab evidence audit
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/dan-terminal/scripts/dan-lab-audit.sh
