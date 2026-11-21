@@ -11,6 +11,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven(url = "https://jitpack.io")
     }
 }
 
@@ -20,4 +21,5 @@ include(":app")
 include(":core:security")
 include(":core:shizuku")
 include(":core:bluetooth")
+include(":core:network")
 include(":feature:termux")

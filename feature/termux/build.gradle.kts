@@ -18,4 +18,5 @@ dependencies {
     implementation(project(":core:security"))
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.core.ktx)
+    testImplementation(libs.junit)
 }

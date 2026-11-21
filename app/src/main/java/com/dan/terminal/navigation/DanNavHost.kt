@@ -1,6 +1,8 @@
 package com.dan.terminal.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -11,39 +13,68 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.dan.terminal.core.bluetooth.BleDevice
 import com.dan.terminal.core.security.AccessRequiredDialog
+import com.dan.terminal.core.security.AccessCapability
 import com.dan.terminal.di.LocalAppContainer
 import com.dan.terminal.feature.bluetooth.BluetoothScreen
 import com.dan.terminal.feature.bluetooth.GattScreen
 import com.dan.terminal.feature.shizuku.ShizukuScreen
+import com.dan.terminal.feature.network.NetworkDiagnosticsScreen
 import com.dan.terminal.feature.termux.TermuxScreen
+import com.dan.terminal.feature.termux.TerminalConsoleScreen
+import com.dan.terminal.feature.termux.LocalShellScreen
 import com.dan.terminal.ui.HomeScreen
 
 @Composable
 fun DanNavHost() {
     val navController = rememberNavController()
+    val context = LocalContext.current
+    val preferences = remember(context) { context.getSharedPreferences("dan_terminal_setup", 0) }
+    val initialRoute = remember(preferences) {
+        terminalStartRoute(preferences.getBoolean("setup_completed", false))
+    }
     val container = LocalAppContainer.current
     val activeRequirement by container.accessCoordinator
         .activeRequirement
         .collectAsState()
     var selectedDevice by remember { mutableStateOf<BleDevice?>(null) }
+    val shizuku by container.shizukuManager.state.collectAsState()
+    LaunchedEffect(shizuku.binderAlive, shizuku.permissionGranted, shizuku.preV11) {
+        container.accessCoordinator.verifyPending()
+    }
 
     activeRequirement?.let { requirement ->
+        val needsShizuku = requirement.capability == AccessCapability.SHIZUKU_SERVICE ||
+            requirement.capability == AccessCapability.SHIZUKU_PERMISSION
         AccessRequiredDialog(
             requirement = requirement,
             coordinator = container.accessCoordinator,
             permissionBroker = container.permissionBroker,
             onOpenShizukuApp = { container.shizukuManager.openShizukuApp() },
             onOpenShizukuDownload = { container.shizukuManager.openShizukuDownload() },
+            shizukuMessage = if (needsShizuku) shizuku.lastError else null,
+            shizukuRequestPending = needsShizuku && shizuku.permissionRequestPending,
+            onVerify = {
+                if (needsShizuku) container.shizukuManager.recheckPermission()
+                container.accessCoordinator.verifyPending()
+            },
             onDismiss = { container.accessCoordinator.dismiss() }
         )
     }
 
-    NavHost(navController = navController, startDestination = "home") {
+    NavHost(navController = navController, startDestination = initialRoute) {
         composable("home") {
             HomeScreen(
                 onBluetooth = { navController.navigate("bluetooth") },
                 onShizuku = { navController.navigate("shizuku") },
-                onTermux = { navController.navigate("termux") }
+                onTermux = { navController.navigate("termux") },
+                onNetworkDiagnostics = { navController.navigate("network") },
+                onConsole = {
+                    preferences.edit().putBoolean("setup_completed", true).apply()
+                    navController.navigate("shell") {
+                        popUpTo("home") { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
             )
         }
         composable("bluetooth") {
@@ -62,5 +93,15 @@ fun DanNavHost() {
         }
         composable("shizuku") { ShizukuScreen() }
         composable("termux") { TermuxScreen() }
+        composable("network") { NetworkDiagnosticsScreen(onBack = { navController.popBackStack() }) }
+        composable("shell") {
+            LocalShellScreen(
+                onSettings = { navController.navigate("home") },
+                onLegacyConsole = { navController.navigate("console") }
+            )
+        }
+        composable("console") {
+            TerminalConsoleScreen(onBack = { navController.navigate("home") { launchSingleTop = true } })
+        }
     }
 }

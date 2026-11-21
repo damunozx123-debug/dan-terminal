@@ -20,7 +20,9 @@ import com.dan.terminal.di.LocalAppContainer
 fun HomeScreen(
     onBluetooth: () -> Unit,
     onShizuku: () -> Unit,
-    onTermux: () -> Unit
+    onTermux: () -> Unit,
+    onConsole: () -> Unit,
+    onNetworkDiagnostics: () -> Unit
 ) {
     val container = LocalAppContainer.current
     val shizuku by container.shizukuManager.state.collectAsState()
@@ -30,7 +32,7 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("DAN Terminal", style = MaterialTheme.typography.headlineMedium)
-        Text("M0 + M1 baseline", style = MaterialTheme.typography.bodyMedium)
+        Text("Setup and tools", style = MaterialTheme.typography.bodyMedium)
         StatusCard(
             title = "Shizuku",
             value = when {
@@ -40,10 +42,21 @@ fun HomeScreen(
             }
         )
         StatusCard("Termux", if (container.termuxBridge.isInstalled()) "Installed" else "Not installed")
-        StatusCard("Bluetooth", if (container.bleScanner.isBluetoothEnabled) "Enabled" else "Disabled")
+        StatusCard("Bluetooth", when {
+            !container.bleScanner.isLeSupported -> "BLE not supported"
+            !container.permissionBroker.isBluetoothConnectGranted() -> "Permission needed"
+            container.bleScanner.isBluetoothEnabled -> "Enabled"
+            else -> "Disabled"
+        })
 
+        Button(onClick = onConsole, modifier = Modifier.fillMaxWidth()) {
+            Text("Open terminal console")
+        }
         Button(onClick = onBluetooth, modifier = Modifier.fillMaxWidth()) {
             Text("Bluetooth / BLE / GATT")
+        }
+        Button(onClick = onNetworkDiagnostics, modifier = Modifier.fillMaxWidth()) {
+            Text("Connectivity diagnostics")
         }
         Button(onClick = onShizuku, modifier = Modifier.fillMaxWidth()) {
             Text("Shizuku privilege broker")

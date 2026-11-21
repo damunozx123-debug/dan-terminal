@@ -21,9 +21,7 @@ android {
     val updateAlias = providers.environmentVariable("DAN_UPDATE_KEY_ALIAS").orNull
     val updateStorePassword = providers.environmentVariable("DAN_UPDATE_STORE_PASSWORD").orNull
     val updateKeyPassword = providers.environmentVariable("DAN_UPDATE_KEY_PASSWORD").orNull
-    val updateSigningEnabled = listOf(updateStore, updateAlias, updateStorePassword, updateKeyPassword)
-        .all { !it.isNullOrBlank() }
-
+    val updateSigningEnabled = listOf(updateStore, updateAlias, updateStorePassword, updateKeyPassword).all { !it.isNullOrBlank() }
     signingConfigs {
         if (updateSigningEnabled) {
             create("obtainium") {
@@ -36,7 +34,19 @@ android {
     }
     buildTypes {
         getByName("debug") {
+            // Separate development install. Never replace or erase the existing app.
+            // Kotlin namespace / class names remain com.dan.terminal.
+            applicationIdSuffix = ".dev"
             if (updateSigningEnabled) signingConfig = signingConfigs.getByName("obtainium")
+        }
+        create("preview") {
+            initWith(getByName("debug"))
+            // A fresh install path for testers whose older Dev APK has an
+            // unrecoverable ephemeral CI signing key. Keep its private data intact.
+            applicationIdSuffix = ".preview"
+            versionNameSuffix = "-readable-preview"
+            matchingFallbacks += listOf("debug")
+            resValue("string", "app_name", "DAN Terminal Preview")
         }
         release {
             isMinifyEnabled = false
@@ -55,10 +65,14 @@ dependencies {
     implementation(project(":core:security"))
     implementation(project(":core:shizuku"))
     implementation(project(":core:bluetooth"))
+    implementation(project(":core:network"))
     implementation(project(":feature:termux"))
+    // The app manifest declares ShizukuProvider, so lint needs this on its own classpath.
+    implementation(libs.shizuku.provider)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.navigation.compose)
@@ -69,11 +83,16 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.termux.terminal.view)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockito.core)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

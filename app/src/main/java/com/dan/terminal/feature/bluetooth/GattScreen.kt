@@ -12,12 +12,16 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.dan.terminal.core.bluetooth.BleDevice
 import com.dan.terminal.core.bluetooth.GattConnectionState
 import com.dan.terminal.core.bluetooth.GattInspector
@@ -31,8 +35,19 @@ fun GattScreen(
 ) {
     val container = LocalAppContainer.current
     val context = LocalContext.current
-    val inspector = remember { GattInspector(context) }
+    val inspector = remember(context) { GattInspector(context) }
     val state by inspector.state.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, inspector) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) inspector.disconnect()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            inspector.disconnect()
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -50,7 +65,7 @@ fun GattScreen(
                     inspector.connect(device.raw)
                 }
             },
-            enabled = device != null,
+            enabled = device?.isConnectable == true && state != GattConnectionState.Connecting,
             modifier = Modifier.fillMaxWidth()
         ) { Text("Connect") }
 
@@ -61,7 +76,7 @@ fun GattScreen(
 
         when (val current = state) {
             is GattConnectionState.Services -> {
-                LazyColumn {
+                LazyColumn(modifier = Modifier.weight(1f)) {
                     items(current.services) { service ->
                         Card(modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.padding(12.dp)) {

@@ -9,3 +9,5 @@ keystore.properties
 captures/
 .externalNativeBuild/
 .cxx/
+__pycache__/
+*.py[cod]

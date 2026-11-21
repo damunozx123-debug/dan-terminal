@@ -25,11 +25,6 @@ class PermissionBroker(private val context: Context) {
             isGranted(Manifest.permission.BLUETOOTH)
     }
 
-    fun bluetoothPermissions(): Array<String> = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> arrayOf(
-            Manifest.permission.BLUETOOTH_SCAN,
-            Manifest.permission.BLUETOOTH_CONNECT
-        )
-        else -> arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
-    }
+    fun runtimePermissions(capability: AccessCapability): Array<String> =
+        RuntimePermissionPolicy.forCapability(capability, Build.VERSION.SDK_INT)
 }

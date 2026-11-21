@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import tomllib
 from pathlib import Path
@@ -36,7 +37,15 @@ require(
     "Mockito inline mock-maker configuration is missing",
 )
 
-xml_files = list(ROOT.rglob("*.xml"))
+xml_files = []
+for directory, children, filenames in os.walk(ROOT):
+    current = Path(directory)
+    # Generated/cache output is not source. Preserve legitimate assets named
+    # build below a source set, so malformed source XML still fails validation.
+    if "src" not in current.relative_to(ROOT).parts:
+        children[:] = [name for name in children
+                       if name not in {"build", ".gradle", ".git", ".kotlin"}]
+    xml_files.extend(current / name for name in filenames if name.endswith(".xml"))
 for xml_file in xml_files:
     ElementTree.parse(xml_file)
 
