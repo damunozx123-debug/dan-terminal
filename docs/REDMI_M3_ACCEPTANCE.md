@@ -61,3 +61,15 @@ screen recording for failures and note the exact steps that reproduce them.
   shell state but do not explicitly document leaving and reopening the screen.
 - A font-size correction is in development. None of the observations above
   verifies its newer APK, Ctrl+C, background survival or release signing.
+
+## Device observation — 21 November 2026 (Redmi Android 16)
+
+A fresh user-supplied screenshot from installed `com.dan.terminal.dev` shows the **app-owned PTY screen**, clearly distinct from the separate one-shot DAN Console. The captured interactive shell transcript demonstrates:
+
+- `echo DAN_PTY_OUTPUT_OK` prints `DAN_PTY_OUTPUT_OK`.
+- `tty` reports a `/dev/pts/...` terminal device.
+- `test -t 0 && echo PTY_STDIN_OK` prints `PTY_STDIN_OK`.
+- `export DAN_TEST=ready`, `cd /system`, `pwd`, and `echo "$DAN_TEST"` run as separate commands, with `/system` and `ready` preserved.
+- The Android software keyboard and PTY on-screen Ctrl+C/Ctrl+D/Esc/Tab/up/down controls are visible. Control-key behavior itself is **not tested**.
+
+**Evidence scope:** Physical phone UI and shell-state checks PASS. App APK hash/signing provenance, Ctrl+C interruption, key controls, rotation/resize, navigation, background survival, clipboard safety and release candidate acceptance remain **unverified**. The shown PTY text is very small, and the latest proposed A−/A+ font controls are **not visible in this installed build**; do not infer that the source-side font fix was installed. An independent read-only wireless ADB audit on the same date returned `ANDROID_AUDIT_COMPLETE` and exit code 0, but it does not establish PTY acceptance beyond the screenshot.
