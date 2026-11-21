@@ -93,7 +93,9 @@ class PtyTerminalServiceTest {
             resizeOnMainThread(session, columns = 100, rows = 40)
             resizeOnMainThread(session, columns = 80, rows = 24)
         }
-        awaitText(session, "M3_REFLOW=OK")
+        // 100 paced lines plus 20 synchronous resizes can exceed 8s on CI emulators.
+        // Keep the output assertion, but give only this stress case a bounded 30s budget.
+        awaitText(session, "M3_REFLOW=OK", timeoutSeconds = 30)
         send(session, "stty size")
         awaitText(session, "24 80")
     }
@@ -120,8 +122,8 @@ class PtyTerminalServiceTest {
         session.write(bytes, 0, bytes.size)
     }
 
-    private fun awaitText(session: TerminalSession, expected: String) {
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(8)
+    private fun awaitText(session: TerminalSession, expected: String, timeoutSeconds: Long = 8) {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
         while (System.nanoTime() < deadline) {
             InstrumentationRegistry.getInstrumentation().waitForIdleSync()
             if (transcriptTextOnMainThread(session).contains(expected)) return
