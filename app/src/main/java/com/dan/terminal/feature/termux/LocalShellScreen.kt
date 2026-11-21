@@ -65,6 +65,7 @@ fun LocalShellScreen(
     }
     var binder by remember { mutableStateOf<PtyTerminalService.LocalBinder?>(null) }
     var serviceError by remember { mutableStateOf<String?>(null) }
+    var retentionWarning by remember { mutableStateOf<String?>(null) }
     val connection = remember(context) {
         object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -82,12 +83,20 @@ fun LocalShellScreen(
     DisposableEffect(context, connection) {
         val intent = Intent(context, PtyTerminalService::class.java)
         var isBound = false
+        // Android can reject startService() even when an activity is allowed to
+        // bind. Do not skip the BIND_AUTO_CREATE attempt on that error.
+        val started = try {
+            context.startService(intent) != null
+        } catch (_: RuntimeException) {
+            false
+        }
+        retentionWarning = if (started) null else
+            "Shell may stop after leaving this screen: persistent service start was unavailable."
         try {
-            context.startService(intent)
             isBound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
-            if (!isBound) serviceError = "Unable to connect to the app-owned PTY service."
+            if (!isBound) serviceError = "Unable to bind to the app-owned PTY service."
         } catch (error: Exception) {
-            serviceError = "Unable to start PTY service: ${error.message ?: "unknown error"}"
+            serviceError = "Unable to bind PTY service: ${error.message ?: "unknown error"}"
         }
         onDispose {
             if (isBound) context.unbindService(connection)
@@ -107,6 +116,9 @@ fun LocalShellScreen(
             "App sandbox · PTY session · Android UID",
             style = MaterialTheme.typography.labelSmall
         )
+        retentionWarning?.let { warning ->
+            Text(warning, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End,
