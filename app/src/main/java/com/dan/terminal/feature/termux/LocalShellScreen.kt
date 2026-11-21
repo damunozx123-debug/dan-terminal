@@ -59,6 +59,7 @@ fun LocalShellScreen(
         )
     }
     val terminalTextSize = terminalFontSizePixels(fontSizeSp, LocalDensity.current)
+    var blackArchMessage by remember { mutableStateOf<String?>(null) }
     fun changeFontSize(delta: Int) {
         fontSizeSp = (fontSizeSp + delta).coerceIn(MIN_TERMINAL_FONT_SP, MAX_TERMINAL_FONT_SP)
         appearance.edit().putInt("font_size_sp", fontSizeSp).apply()
@@ -102,6 +103,12 @@ fun LocalShellScreen(
             Text("DAN Terminal", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
             TextButton(onClick = onSettings) { Text("Setup") }
             TextButton(onClick = onLegacyConsole) { Text("Termux") }
+            TextButton(onClick = { blackArchMessage = BlackArchSshLauncher.launch(context) }) {
+                Text("BlackArch")
+            }
+        }
+        if (blackArchMessage != null) {
+            Text(blackArchMessage!!, style = MaterialTheme.typography.bodySmall)
         }
         Text(
             "App sandbox · PTY session · Android UID",
