@@ -164,6 +164,8 @@ def main():
     p.add_argument("--no-ai", action="store_true")
     p.add_argument("--publish", action="store_true",
                    help="Post only a redacted summary to GitHub PR comments")
+    p.add_argument("--publish-on-failure", action="store_true",
+                   help="Publish a redacted GitHub handoff only if tests fail or results are incomplete")
     p.add_argument("--pr", type=int, default=20)
     p.add_argument("--github-repo", default=GITHUB_REPO)
     p.add_argument("--timeout", type=int, default=1800)
@@ -206,7 +208,7 @@ def main():
           " GRADLE_EXIT=" + str(exit_code))
     print("Evidence:", output)
     print("Local AI:", analysis[:800])
-    if a.publish:
+    if a.publish or (a.publish_on_failure and status != "PASS"):
         if not shutil.which("gh"):
             print("GitHub CLI not found; handoff is saved locally", file=sys.stderr)
             return 3
