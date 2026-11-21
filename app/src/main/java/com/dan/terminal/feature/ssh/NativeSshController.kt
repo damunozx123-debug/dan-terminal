@@ -132,7 +132,10 @@ internal class NativeSshController {
                         val received = buffer.copyOf(count)
                         main.post {
                             if (!stopped) {
-                                emulator.append(received, received.size)
+                                runCatching { emulator.append(received, received.size) }
+                                    .onFailure {
+                                        _status.value = "Terminal parser error; disconnect and report this build."
+                                    }
                                 redraw?.invoke()
                             }
                         }
