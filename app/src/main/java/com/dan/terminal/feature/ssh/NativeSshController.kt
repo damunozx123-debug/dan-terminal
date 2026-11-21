@@ -108,7 +108,7 @@ internal class NativeSshController {
             client = ssh
             try {
                 ssh.connectTimeout = 10_000
-                ssh.timeout = 15_000
+                // Do not set a socket read timeout: an idle interactive shell is normal.
                 // Never use PromiscuousVerifier or accept unknown fingerprints.
                 // SSHJ verifies the pinned SHA256 fingerprint during key exchange.
                 ssh.addHostKeyVerifier(target.hostFingerprint.trim())
