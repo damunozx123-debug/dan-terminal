@@ -36,7 +36,52 @@ In ChatGPT, send a message such as:
 
 ChatGPT can retrieve PR comments through the connected GitHub app after a conversation turn. The script does not push messages into the current chat, nor can the local AI apply code changes or merges.
 
-## Fast unattended tests: run after source edits (recommended)
+## Recommended: one-shot tests after each Git commit (no long-running watcher)
+
+The **commit-triggered** setup avoids an always-on Python watcher and a daily
+timer. A Git post-commit hook starts one systemd **oneshot** service, which
+invokes Gradle once, records its results, and exits as soon as Gradle has
+finished. There is no fixed test duration to wait out and no extra sleep.
+The hook returns immediately so committing code remains responsive.
+
+    cd /home/dan/dan-terminal-m3-verify
+    bash tools/install_dan_ai_one_shot.sh
+
+On the next Git commit, the hook requests a quick JVM/build test. Monitor:
+
+    journalctl --user -u dan-ai-test-once.service -f
+    systemctl --user status dan-ai-test-once.service
+
+Or start exactly one quick test manually, without committing:
+
+    systemctl --user start --no-block dan-ai-test-once.service
+
+The service uses Gradle --no-daemon to avoid an idle Gradle build daemon.
+On failure only, a **separate short-lived** systemd unit analyzes the saved
+Gradle log using Ollama, and the user-opted-in service configuration posts
+a bounded report to GitHub PR #20. The quick test itself does **not wait**
+for AI text generation or GitHub publication. Logs remain on disk.
+
+On successful builds, no AI analysis or GitHub upload is performed. The
+previous edit watcher and nightly timer are **disabled** by the installer to
+avoid duplicating jobs. No ADB-connected tests are run automatically.
+
+This changes trigger granularity: tests run **after Git commits**, not every
+source-file save. The older watcher described below is an alternative,
+not something to run at the same time. A second commit while a oneshot job
+is already active may be coalesced; after a rapid sequence, start one manual
+test if you require an explicit test of the final working tree.
+
+To remove the one-shot hook, remove only the DAN-AI-owned Git hook and service
+(after checking neither was changed locally), then run:
+
+    systemctl --user stop dan-ai-test-once.service
+
+Do not enable both the commit hook and the watcher.
+
+## Alternative: continuous edit watcher (uses a persistent watcher process)
+
+## Fast unattended tests: run after source edits (optional)
 
 The default 20:00 daily timer is too slow for active development. The optional
 watcher uses inotify (not polling) to detect Android source or Gradle config edits,
