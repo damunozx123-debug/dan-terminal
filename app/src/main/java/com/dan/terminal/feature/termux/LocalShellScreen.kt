@@ -8,6 +8,8 @@ import android.graphics.Color
 import android.os.IBinder
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -205,18 +207,30 @@ fun LocalShellScreen(
                 else -> AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { viewContext ->
-                        TerminalView(viewContext, null).apply {
-                            setBackgroundColor(Color.rgb(16, 19, 24))
-                            setTextSize(terminalTextSize)
-                            tag = terminalTextSize
-                            contentDescription = "Interactive terminal"
-                            isFocusableInTouchMode = true
-                            setTerminalViewClient(PtyTerminalViewClient(this))
-                            attachSession(session)
-                            requestFocus()
+                        // Give the native terminal an explicit Android ViewGroup host.
+                        // This preserves a measurable MATCH_PARENT child throughout
+                        // Compose recomposition and makes native hierarchy tests exact.
+                        FrameLayout(viewContext).apply {
+                            addView(
+                                TerminalView(viewContext, null).apply {
+                                    setBackgroundColor(Color.rgb(16, 19, 24))
+                                    setTextSize(terminalTextSize)
+                                    tag = terminalTextSize
+                                    contentDescription = "Interactive terminal"
+                                    isFocusableInTouchMode = true
+                                    setTerminalViewClient(PtyTerminalViewClient(this))
+                                    attachSession(session)
+                                    requestFocus()
+                                },
+                                FrameLayout.LayoutParams(
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                    ViewGroup.LayoutParams.MATCH_PARENT
+                                )
+                            )
                         }
                     },
-                    update = { view ->
+                    update = { host ->
+                        val view = host.getChildAt(0) as TerminalView
                         // PTY output also triggers this callback. Only rebuild the
                         // renderer and resize the grid when the font actually changes.
                         if (view.tag != terminalTextSize) {
