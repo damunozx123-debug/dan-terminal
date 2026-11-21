@@ -5,6 +5,8 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
+  # Opt-in CI for stacked feature/test/fix PRs without running costly emulators on every stack update.
+  workflow_dispatch:
 
 jobs:
   build:
