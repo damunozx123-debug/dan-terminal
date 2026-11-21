@@ -73,3 +73,7 @@ A fresh user-supplied screenshot from installed `com.dan.terminal.dev` shows the
 - The Android software keyboard and PTY on-screen Ctrl+C/Ctrl+D/Esc/Tab/up/down controls are visible. Control-key behavior itself is **not tested**.
 
 **Evidence scope:** Physical phone UI and shell-state checks PASS. App APK hash/signing provenance, Ctrl+C interruption, key controls, rotation/resize, navigation, background survival, clipboard safety and release candidate acceptance remain **unverified**. The shown PTY text is very small, and the latest proposed A−/A+ font controls are **not visible in this installed build**; do not infer that the source-side font fix was installed. An independent read-only wireless ADB audit on the same date returned `ANDROID_AUDIT_COMPLETE` and exit code 0, but it does not establish PTY acceptance beyond the screenshot.
+
+### Ctrl+C interruption — physical Redmi, 21 November 2026
+
+A follow-up user screenshot of `com.dan.terminal.dev` shows `sleep 30` interrupted by on-screen **Ctrl+C** twice. Both attempts display `^C`, shell status `130`, and a usable prompt following interruption. Mark the **Ctrl+C foreground interruption and shell usability** check **PASS (user-observed)**. This is not evidence of long-running job lifecycle/background recovery. Terminal text remains extremely small in this installed build.
