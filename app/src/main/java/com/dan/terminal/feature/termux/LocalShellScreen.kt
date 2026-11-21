@@ -6,8 +6,10 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.graphics.Color
 import android.os.IBinder
+import android.util.Log
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.view.inputmethod.InputMethodManager
@@ -207,10 +209,22 @@ fun LocalShellScreen(
                 else -> AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { viewContext ->
+                        // Temporary non-sensitive diagnostics for the 0/6 Redmi UI gate.
+                        // These distinguish a missing factory call from a missing
+                        // attach/layout, without recording terminal text or commands.
+                        Log.i("DAN-M3-UI", "native factory entered")
                         // Give the native terminal an explicit Android ViewGroup host.
                         // This preserves a measurable MATCH_PARENT child throughout
                         // Compose recomposition and makes native hierarchy tests exact.
                         FrameLayout(viewContext).apply {
+                            addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+                                override fun onViewAttachedToWindow(view: View) {
+                                    Log.i("DAN-M3-UI", "native host attached children=" + childCount)
+                                }
+                                override fun onViewDetachedFromWindow(view: View) {
+                                    Log.i("DAN-M3-UI", "native host detached")
+                                }
+                            })
                             addView(
                                 TerminalView(viewContext, null).apply {
                                     setBackgroundColor(Color.rgb(16, 19, 24))
@@ -227,6 +241,8 @@ fun LocalShellScreen(
                                     ViewGroup.LayoutParams.MATCH_PARENT
                                 )
                             )
+                            Log.i("DAN-M3-UI", "native factory ready child=" +
+                                getChildAt(0).javaClass.name)
                         }
                     },
                     update = { host ->
