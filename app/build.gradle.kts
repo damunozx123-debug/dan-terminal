@@ -84,6 +84,7 @@ dependencies {
     implementation(libs.androidx.compose.material.icons)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.termux.terminal.view)
+    implementation(libs.sshj)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
