@@ -120,6 +120,7 @@ def local_ai(model, report, log_path):
               "Mark unknowns clearly.\n\nREPORT:\n" +
               json.dumps(report, indent=2) + "\n\nLOG TAIL:\n" + excerpt)
     data = json.dumps({"model": model, "prompt": prompt, "stream": False,
+                       "keep_alive": 0,
                        "options": {"temperature": 0.1, "num_predict": 450}}).encode()
     request = urllib.request.Request(
         "http://127.0.0.1:11434/api/generate", data=data,
