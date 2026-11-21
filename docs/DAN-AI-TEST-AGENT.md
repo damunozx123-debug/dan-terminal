@@ -36,7 +36,7 @@ existing local Ollama API already answers.
     python tools/dan_ai_test_agent.py --mode ui
     python tools/dan_ai_test_agent.py --mode full
 
-Quick builds and runs app JVM unit tests. UI runs the six graphical terminal cases. Full runs all connected Android instrumentation tests. UI/full require exactly one online ADB device; connected tests can install or update the Dev test package and interrupt its session.
+Quick builds the app and invokes the JVM unit-test task for **all Android modules**, not just app. Unit tests may still be UP-TO-DATE when Gradle caches them. The report distinguishes fresh_xml, cached_xml, and none, and NEVER reports PASS when zero test cases are found. A BUILD SUCCESSFUL line alone is compilation success, not test evidence. On NO_TEST_EVIDENCE the one-shot run returns exit 2 and preserves its report without starting Ollama or publishing failure alerts. UI runs the six graphical terminal cases. Full runs all connected Android instrumentation tests. UI/full require exactly one online ADB device; connected tests can install or update the Dev test package and interrupt its session.
 
 Send a summarized report to the existing PR:
 
