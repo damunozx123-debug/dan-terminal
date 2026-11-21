@@ -31,23 +31,31 @@ Run in a BlackArch shell, not Termux's local shell:
 
 ```bash
 mkdir -p "$HOME/.config/dan"
-if [[ -f "$HOME/.config/dan/repo-switch.sh" ]]; then
-  cp -p "$HOME/.config/dan/repo-switch.sh" "$HOME/.config/dan/repo-switch.sh.previous"
+if TMP="$(mktemp)"; then
+  if gh api repos/damunozx123-debug/dan-os/contents/scripts/dan-repo-switch.sh --jq '.content' | base64 -d > "$TMP" &&
+      [[ -s "$TMP" ]] && bash -n "$TMP"; then
+    if [[ -f "$HOME/.config/dan/repo-switch.sh" ]]; then
+      cp -p "$HOME/.config/dan/repo-switch.sh" "$HOME/.config/dan/repo-switch.sh.previous"
+    fi
+    if install -m 600 "$TMP" "$HOME/.config/dan/repo-switch.sh"; then
+      LINE='source "$HOME/.config/dan/repo-switch.sh"'
+      grep -Fqx "$LINE" "$HOME/.bashrc" ||
+        printf '%s\n' "$LINE" >> "$HOME/.bashrc"
+      source "$HOME/.config/dan/repo-switch.sh"
+      type repo repos
+    fi
+  else
+    echo "Download or syntax check failed; existing switcher unchanged." >&2
+  fi
+  rm -f "$TMP"
+else
+  echo "Could not create temporary download file." >&2
 fi
-
-gh api repos/damunozx123-debug/dan-os/contents/scripts/dan-repo-switch.sh   --jq '.content' | base64 -d > "$HOME/.config/dan/repo-switch.sh"
-
-bash -n "$HOME/.config/dan/repo-switch.sh" || return 1
-LINE='source "$HOME/.config/dan/repo-switch.sh"'
-grep -Fqx "$LINE" "$HOME/.bashrc" || printf '%s\n' "$LINE" >> "$HOME/.bashrc"
-source "$HOME/.config/dan/repo-switch.sh"
-type repo repos
 ```
 
-Note: The `return 1` on syntax failure applies when these commands are run
-from a sourced Bash setup; use `exit 1` instead in a stand-alone provisioning
-script. Do not proceed to sourcing if `bash -n` fails. A future handover
-should record actual shell validation and a `repos` interaction separately.
+This installer validates the downloaded script before replacing the local
+copy, and backs up any existing switcher. The workflow remains unverified on
+BlackArch until the operator confirms `repo` and `repos` function correctly.
 
 Interactive usage:
 
