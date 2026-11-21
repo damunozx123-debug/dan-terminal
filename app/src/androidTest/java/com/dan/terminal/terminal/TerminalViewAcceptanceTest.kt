@@ -284,7 +284,15 @@ class TerminalViewAcceptanceTest {
             ).joinToString("; ")
         }
         val semantics = runCatching {
-            compose.onRoot(useUnmergedTree = true).printToString(maxDepth = 8).take(2400)
+            val tree = compose.onRoot(useUnmergedTree = true).printToString(maxDepth = 8)
+            // The first 2,400 characters hide the bottom-of-screen status text
+            // ("Starting interactive shell" vs the real service/bind error).
+            // Extract readable labels before keeping a bounded tree excerpt.
+            val labels = tree.lineSequence()
+                .filter { "Text = " in it || "ContentDescription = " in it }
+                .joinToString(" | ")
+                .take(6000)
+            "visibleLabels=[" + labels + "]; treeTail=" + tree.takeLast(4000)
         }.getOrElse { "Unavailable: ${it.javaClass.simpleName}: ${it.message}" }
         throw AssertionError(
             "Terminal view did not reach expected state through Android input. " +
