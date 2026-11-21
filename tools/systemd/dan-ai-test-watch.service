@@ -1,0 +1,14 @@
+[Unit]
+Description=DAN Terminal edit-triggered local AI quick tests
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/dan/dan-terminal-m3-verify
+ExecStart=/usr/bin/python3 /home/dan/dan-terminal-m3-verify/tools/dan_ai_test_watch.py --repo-path /home/dan/dan-terminal-m3-verify --debounce 10 --publish-failures
+Restart=on-failure
+RestartSec=15
+Nice=10
+
+[Install]
+WantedBy=default.target

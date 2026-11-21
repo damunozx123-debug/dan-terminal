@@ -1,0 +1,12 @@
+[Unit]
+Description=DAN Terminal one-shot quick test on Git commit
+After=default.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/dan/dan-terminal-m3-verify
+# The test runner exits as soon as Gradle returns. AI failure analysis and
+# (opt-in) GitHub handoff are handled in a separate short-lived process.
+ExecStart=/usr/bin/python3 /home/dan/dan-terminal-m3-verify/tools/dan_ai_test_agent.py --mode quick --defer-ai --no-gradle-daemon --publish-on-failure
+TimeoutStartSec=35min
+Nice=10

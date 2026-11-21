@@ -1,0 +1,10 @@
+[Unit]
+Description=Opt-in daily DAN Terminal local test and GitHub report
+
+[Timer]
+OnCalendar=*-*-* 20:00:00
+Persistent=true
+Unit=dan-ai-test.service
+
+[Install]
+WantedBy=timers.target

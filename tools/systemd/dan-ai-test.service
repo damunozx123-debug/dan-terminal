@@ -1,0 +1,9 @@
+[Unit]
+Description=DAN Terminal local AI quick tests and GitHub handoff
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/dan/dan-terminal-m3-verify
+ExecStart=/usr/bin/python3 /home/dan/dan-terminal-m3-verify/tools/dan_ai_test_agent.py --mode quick --publish --pr 20
+TimeoutStartSec=40min
+Nice=10

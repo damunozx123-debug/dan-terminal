@@ -1,0 +1,11 @@
+#!/bin/sh
+# DAN AI: trigger a one-shot test after each Git commit, never watch forever.
+# This hook does not block commits or alter working-tree files.
+root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+[ -f "$root/tools/dan_ai_test_agent.py" ] || exit 0
+if command -v systemctl >/dev/null 2>&1; then
+  if ! systemctl --user start --no-block dan-ai-test-once.service >/dev/null 2>&1; then
+    echo "DAN-AI: user service not available; run python3 tools/dan_ai_test_agent.py --mode quick" >&2
+  fi
+fi
+exit 0
