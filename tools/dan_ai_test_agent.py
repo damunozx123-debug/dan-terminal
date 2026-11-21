@@ -56,8 +56,10 @@ def attached_device():
         "android": command_output(["adb", "-s", serial, "shell", "getprop", "ro.build.version.release"])
     }
 
-def run_gradle(root, mode, log_path, timeout):
+def run_gradle(root, mode, log_path, timeout, no_gradle_daemon=False):
     args = [str(root / "gradlew"), *TASKS[mode], "--console=plain"]
+    if no_gradle_daemon:
+        args.append("--no-daemon")
     print("Running:", " ".join(args[1:]), flush=True)
     with log_path.open("wb") as stream:
         try:
@@ -162,6 +164,10 @@ def main():
     p.add_argument("--repo-path", type=Path, default=DEFAULT_REPO)
     p.add_argument("--model", default="qwen2.5-coder:1.5b")
     p.add_argument("--no-ai", action="store_true")
+    p.add_argument("--defer-ai", action="store_true",
+                   help="Return immediately after Gradle/evidence; run failed-test AI handoff separately")
+    p.add_argument("--no-gradle-daemon", action="store_true",
+                   help="Use short-lived Gradle process, avoiding a retained build daemon")
     p.add_argument("--analyze-passes", action="store_true",
                    help="Also use Ollama on successful runs; skipped by default for speed")
     p.add_argument("--publish", action="store_true",
@@ -188,7 +194,7 @@ def main():
     output.mkdir(parents=True, exist_ok=True)
     log = output / "gradle.log"
     since = dt.datetime.now(dt.timezone.utc).timestamp()
-    exit_code = run_gradle(root, a.mode, log, a.timeout)
+    exit_code = run_gradle(root, a.mode, log, a.timeout, a.no_gradle_daemon)
     totals, failures, xml_count = parse_tests(root, a.mode, since)
     status = ("FAIL" if exit_code or totals["failures"] or totals["errors"] else
               "INCOMPLETE" if a.mode != "quick" and (xml_count == 0 or totals["tests"] == 0)
@@ -200,7 +206,9 @@ def main():
         "commit": command_output(["git", "rev-parse", "--short=12", "HEAD"], root),
         "tests": totals, "failing_tests": failures,
     }
-    analysis = ("AI disabled" if a.no_ai else
+    needs_deferred_ai = a.defer_ai and not a.no_ai and status != "PASS"
+    analysis = ("AI follow-up scheduled separately" if needs_deferred_ai else
+                "AI disabled" if a.no_ai else
                 "Tests passed; AI triage skipped for fast feedback" if status == "PASS" and not a.analyze_passes else
                 local_ai(a.model, report, log))
     (output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
@@ -212,6 +220,34 @@ def main():
           " GRADLE_EXIT=" + str(exit_code))
     print("Evidence:", output)
     print("Local AI:", analysis[:800])
+    if needs_deferred_ai:
+        # The Gradle test run is complete. Start a distinct short-lived unit
+        # for AI triage so the test service can exit immediately. systemd-run
+        # is essential under systemd: detached child processes in this service's
+        # cgroup would otherwise be killed when Type=oneshot ends.
+        followup = [
+            sys.executable, str(root / "tools" / "dan_ai_test_followup.py"),
+            "--evidence", str(output), "--model", a.model,
+            "--github-repo", a.github_repo, "--pr", str(a.pr),
+        ]
+        if a.publish or a.publish_on_failure:
+            followup.append("--publish")
+        if shutil.which("systemd-run"):
+            unit = "dan-ai-followup-" + run_id.lower()
+            launch = ["systemd-run", "--user", "--no-block", "--collect",
+                      "--unit", unit, *followup]
+            try:
+                result = subprocess.run(launch, cwd=root, capture_output=True,
+                                        text=True, timeout=10)
+                if result.returncode != 0:
+                    print("Unable to queue AI follow-up: " +
+                          redact(result.stderr)[:250], file=sys.stderr)
+            except (OSError, subprocess.TimeoutExpired):
+                print("Unable to queue AI follow-up", file=sys.stderr)
+        else:
+            print("systemd-run unavailable: review evidence and run the AI follow-up manually",
+                  file=sys.stderr)
+        return 0 if status == "PASS" else 1
     if a.publish or (a.publish_on_failure and status != "PASS"):
         if not shutil.which("gh"):
             print("GitHub CLI not found; handoff is saved locally", file=sys.stderr)
