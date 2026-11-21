@@ -29,3 +29,12 @@ DAN Terminal currently has a separate app implementation/acceptance track. The p
 
 ## For another ChatGPT chat
 Read this file and distinguish **verified operator evidence** from **proposed integration**. Before changing code, inspect the actual repository branch and implementation. Do not claim a merged feature, successful Android app test, current connection, or reboot persistence without new evidence. Do not modify PAM/firewall rules or start network scans as a side effect.
+
+## Related repo-navigation handover (added 22 Nov 2026 NZDT)
+
+See [REPO_SWITCHER_HANDOVER_2026-11-22.md](REPO_SWITCHER_HANDOVER_2026-11-22.md)
+for the user-verified `dan`, `bmw` and `terminal` shortcuts, known tmux
+session names, canonical versioned multi-repository switcher in `dan-os`,
+and the safe BlackArch installation procedure. The new `repo`/`repos`
+workflow is **committed to GitHub but not yet verified installed on BlackArch**.
+This does not alter the historical connection verification above.
