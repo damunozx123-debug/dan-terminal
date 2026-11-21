@@ -7,6 +7,7 @@ import android.content.Intent
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.util.TypedValue
+import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -223,12 +224,21 @@ class TerminalViewAcceptanceTest {
         preferences.edit().putBoolean("setup_completed", true).commit()
         context.stopService(Intent(context, PtyTerminalService::class.java))
         instrumentation.waitForIdleSync()
+        Log.i("DAN-M3-TEST", "launching activity for terminal acceptance")
         try {
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-                await(scenario) { it.currentSession?.emulator != null }
-                block(scenario)
+                Log.i("DAN-M3-TEST", "activity launched; waiting for native terminal")
+                try {
+                    await(scenario) { it.currentSession?.emulator != null }
+                    block(scenario)
+                } finally {
+                    // This timestamp distinguishes expected teardown detach from
+                    // a premature detach while the test is still waiting.
+                    Log.i("DAN-M3-TEST", "closing ActivityScenario")
+                }
             }
         } finally {
+            Log.i("DAN-M3-TEST", "stopping acceptance PTY service")
             context.stopService(Intent(context, PtyTerminalService::class.java))
             preferences.edit().putBoolean("setup_completed", oldSetup).commit()
         }
@@ -246,15 +256,23 @@ class TerminalViewAcceptanceTest {
     }
 
     private fun await(scenario: ActivityScenario<MainActivity>, predicate: (TerminalView) -> Boolean) {
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(12)
+        val started = System.nanoTime()
+        val deadline = started + TimeUnit.SECONDS.toNanos(12)
+        Log.i("DAN-M3-TEST", "native view wait started (12s bound)")
         while (System.nanoTime() < deadline) {
             var matched = false
             scenario.onActivity { activity ->
                 findTerminal(activity.window.decorView)?.let { matched = predicate(it) }
             }
-            if (matched) return
+            if (matched) {
+                Log.i("DAN-M3-TEST", "native view condition matched after " +
+                    TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) + "ms")
+                return
+            }
             Thread.sleep(50)
         }
+        Log.i("DAN-M3-TEST", "native view wait timed out after " +
+            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) + "ms")
         // Capture what actually mounted, instead of hiding six distinct readiness
         // failures behind the same timeout message. No extra waiting or skipped tests.
         var diagnostic = "Activity unavailable"
