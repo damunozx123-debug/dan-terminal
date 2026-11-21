@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily DAN Android lab evidence audit
+
+[Timer]
+OnCalendar=*-*-* 09:00:00
+Persistent=true
+Unit=dan-lab-audit.service
+
+[Install]
+WantedBy=timers.target
