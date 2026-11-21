@@ -162,6 +162,8 @@ def main():
     p.add_argument("--repo-path", type=Path, default=DEFAULT_REPO)
     p.add_argument("--model", default="qwen2.5-coder:1.5b")
     p.add_argument("--no-ai", action="store_true")
+    p.add_argument("--analyze-passes", action="store_true",
+                   help="Also use Ollama on successful runs; skipped by default for speed")
     p.add_argument("--publish", action="store_true",
                    help="Post only a redacted summary to GitHub PR comments")
     p.add_argument("--publish-on-failure", action="store_true",
@@ -198,7 +200,9 @@ def main():
         "commit": command_output(["git", "rev-parse", "--short=12", "HEAD"], root),
         "tests": totals, "failing_tests": failures,
     }
-    analysis = "AI disabled" if a.no_ai else local_ai(a.model, report, log)
+    analysis = ("AI disabled" if a.no_ai else
+                "Tests passed; AI triage skipped for fast feedback" if status == "PASS" and not a.analyze_passes else
+                local_ai(a.model, report, log))
     (output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     (output / "ai-analysis.txt").write_text(analysis + "\n")
     handoff = output / "chatgpt-handoff.md"
