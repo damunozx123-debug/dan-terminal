@@ -48,7 +48,8 @@ import com.termux.view.TerminalViewClient
 @Composable
 fun LocalShellScreen(
     onSettings: () -> Unit,
-    onLegacyConsole: () -> Unit
+    onLegacyConsole: () -> Unit,
+    onNativeSsh: () -> Unit
 ) {
     val context = LocalContext.current.applicationContext
     val appearance = remember(context) { context.getSharedPreferences("dan_terminal_appearance", 0) }
@@ -103,8 +104,13 @@ fun LocalShellScreen(
             Text("DAN Terminal", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
             TextButton(onClick = onSettings) { Text("Setup") }
             TextButton(onClick = onLegacyConsole) { Text("Termux") }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(onClick = { blackArchMessage = BlackArchSshLauncher.launch(context) }) {
-                Text("BlackArch")
+                Text("Open in Termux")
+            }
+            TextButton(onClick = onNativeSsh) {
+                Text("SSH (native)")
             }
         }
         if (blackArchMessage != null) {
