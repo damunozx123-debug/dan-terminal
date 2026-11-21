@@ -20,7 +20,7 @@ DEFAULT_REPO = Path("/home/dan/dan-terminal-m3-verify")
 GITHUB_REPO = "damunozx123-debug/dan-terminal"
 UI_TEST = "com.dan.terminal.terminal.TerminalViewAcceptanceTest"
 TASKS = {
-    "quick": [":app:assembleDebug", ":app:testDebugUnitTest"],
+    "quick": [":app:assembleDebug", "testDebugUnitTest"],
     "ui": [":app:connectedDebugAndroidTest",
            "-Pandroid.testInstrumentationRunnerArguments.class=" + UI_TEST],
     "full": [":app:connectedDebugAndroidTest"],
@@ -82,34 +82,57 @@ def run_gradle(root, mode, log_path, timeout, no_gradle_daemon=False):
             p.wait()
             return 130
 
-def parse_tests(root, mode, since):
-    pattern = ("app/build/test-results/testDebugUnitTest/**/TEST-*.xml"
-               if mode == "quick" else
-               "app/build/outputs/androidTest-results/connected/debug/**/TEST-*.xml")
-    totals = dict(tests=0, failures=0, errors=0, skipped=0)
-    failed = []
-    count = 0
-    for path in root.glob(pattern):
-        if path.stat().st_mtime < since - 2:
+def parse_tests(root, mode, since, gradle_output):
+    # A Gradle UP-TO-DATE test task may legitimately reuse older XML.
+    # Report those as cached evidence, never as tests freshly executed.
+    # The unqualified quick selector runs testDebugUnitTest in every subproject.
+    if mode == "quick":
+        paths = root.glob("**/build/test-results/testDebugUnitTest/**/TEST-*.xml")
+    else:
+        paths = root.glob("app/build/outputs/androidTest-results/connected/debug/**/TEST-*.xml")
+    fresh = []
+    cached = []
+    for path in paths:
+        try:
+            updated = path.stat().st_mtime
+        except OSError:
             continue
+        if updated >= since - 2:
+            fresh.append(path)
+        else:
+            cached.append(path)
+
+    # Reuse test XML only if Gradle confirms the matching tasks are UP-TO-DATE.
+    # An old successful XML by itself cannot establish current code passed.
+    up_to_date = "testDebugUnitTest UP-TO-DATE" in gradle_output if mode == "quick" else (
+        "connectedDebugAndroidTest UP-TO-DATE" in gradle_output
+    )
+    selected = fresh if fresh else (cached if up_to_date else [])
+    evidence = "fresh_xml" if fresh else "cached_xml" if selected else "none"
+    totals = dict(tests=0, failures=0, errors=0, skipped=0)
+    failing = []
+    xml_count = 0
+    for path in selected:
         try:
             suite = ET.parse(path).getroot()
         except (OSError, ET.ParseError):
             continue
-        count += 1
-        for k in totals:
-            totals[k] += int(suite.get(k, "0"))
+        xml_count += 1
+        for key in totals:
+            totals[key] += int(suite.get(key, "0"))
         for case in suite.iter("testcase"):
             failure = case.find("failure")
             if failure is None:
                 failure = case.find("error")
-            if failure is not None and len(failed) < 12:
-                failed.append({
+            if failure is not None and len(failing) < 12:
+                failing.append({
                     "case": redact((case.get("classname", "") + "." +
                                     case.get("name", "")).strip("."))[:150],
                     "type": redact(failure.get("type", "test-failure"))[:100]
                 })
-    return totals, failed, count
+    if xml_count == 0:
+        evidence = "none"
+    return totals, failing, xml_count, evidence
 
 def local_ai(model, report, log_path):
     excerpt = redact(log_path.read_text(errors="replace")[-8000:])
@@ -142,7 +165,8 @@ def handoff_text(report, analysis):
         "Branch: " + report["branch"] + " | Commit: " + report["commit"],
         "Device: " + report["device"].get("model", "none") +
             " | Android: " + report["device"].get("android", "n/a"),
-        "Gradle exit: " + str(report["exit_code"]) +
+        "Test evidence: " + report.get("test_evidence", "unknown") +
+            " | Gradle exit: " + str(report["exit_code"]) +
             " | Tests: " + str(tests["tests"]) +
             " | Failures: " + str(tests["failures"]) +
             " | Errors: " + str(tests["errors"]) +
@@ -196,27 +220,29 @@ def main():
     log = output / "gradle.log"
     since = dt.datetime.now(dt.timezone.utc).timestamp()
     exit_code = run_gradle(root, a.mode, log, a.timeout, a.no_gradle_daemon)
-    totals, failures, xml_count = parse_tests(root, a.mode, since)
+    gradle_output = log.read_text(errors="replace")
+    totals, failures, xml_count, evidence = parse_tests(root, a.mode, since, gradle_output)
     status = ("FAIL" if exit_code or totals["failures"] or totals["errors"] else
-              "INCOMPLETE" if a.mode != "quick" and (xml_count == 0 or totals["tests"] == 0)
-              else "PASS")
+              "NO_TEST_EVIDENCE" if xml_count == 0 or totals["tests"] == 0 else
+              "PASS")
     report = {
         "schema": "dan-ai-test-report/v1", "run_id": run_id, "mode": a.mode,
         "status": status, "exit_code": exit_code, "device": device,
         "branch": command_output(["git", "branch", "--show-current"], root),
         "commit": command_output(["git", "rev-parse", "--short=12", "HEAD"], root),
-        "tests": totals, "failing_tests": failures,
+        "tests": totals, "test_evidence": evidence,
+        "failing_tests": failures,
     }
-    needs_deferred_ai = a.defer_ai and not a.no_ai and status != "PASS"
+    needs_deferred_ai = a.defer_ai and not a.no_ai and status == "FAIL"
     analysis = ("AI follow-up scheduled separately" if needs_deferred_ai else
                 "AI disabled" if a.no_ai else
-                "Tests passed; AI triage skipped for fast feedback" if status == "PASS" and not a.analyze_passes else
+                "No failed tests; AI triage skipped for fast feedback" if status != "FAIL" and not a.analyze_passes else
                 local_ai(a.model, report, log))
     (output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     (output / "ai-analysis.txt").write_text(analysis + "\n")
     handoff = output / "chatgpt-handoff.md"
     handoff.write_text(handoff_text(report, analysis))
-    print("STATUS=" + status + " TESTS=" + str(totals["tests"]) +
+    print("STATUS=" + status + " EVIDENCE=" + evidence + " TESTS=" + str(totals["tests"]) +
           " FAILURES=" + str(totals["failures"]) +
           " GRADLE_EXIT=" + str(exit_code))
     print("Evidence:", output)
@@ -248,8 +274,8 @@ def main():
         else:
             print("systemd-run unavailable: review evidence and run the AI follow-up manually",
                   file=sys.stderr)
-        return 0 if status == "PASS" else 1
-    if a.publish or (a.publish_on_failure and status != "PASS"):
+        return 0 if status == "PASS" else 2 if status == "NO_TEST_EVIDENCE" else 1
+    if a.publish or (a.publish_on_failure and status == "FAIL"):
         if not shutil.which("gh"):
             print("GitHub CLI not found; handoff is saved locally", file=sys.stderr)
             return 3
