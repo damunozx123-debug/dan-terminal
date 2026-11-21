@@ -36,7 +36,9 @@ data class BleDevice(
 }
 
 fun ScanResult.toBleDevice(): BleDevice = BleDevice(
-    name = scanRecord?.deviceName ?: try { device.name } catch (_: SecurityException) { null },
+    // Scan advertising data is readable under BLUETOOTH_SCAN. Remote device.name
+    // requires BLUETOOTH_CONNECT on Android 12+, which may not be granted.
+    name = scanRecord?.deviceName,
     address = device.address,
     rssi = rssi,
     serviceUuids = scanRecord?.serviceUuids?.map { it.uuid }.orEmpty(),

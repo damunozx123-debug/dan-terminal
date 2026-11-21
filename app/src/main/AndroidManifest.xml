@@ -13,6 +13,8 @@
 
     <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
     <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <uses-feature
         android:name="android.hardware.bluetooth_le"
@@ -42,6 +44,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".feature.termux.PtyTerminalService"
+            android:exported="false" />
+
+        <receiver
+            android:name="com.dan.terminal.feature.termux.TermuxCommandResultReceiver"
+            android:exported="false" />
 
         <provider
             android:name="rikka.shizuku.ShizukuProvider"

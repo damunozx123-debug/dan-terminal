@@ -22,15 +22,24 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate source tree
         run: python3 scripts/validate_source_tree.py
+      - name: Test source checker after generated build output
+        run: python3 -m unittest -v scripts/test_validate_source_tree.py
       - name: Check bootstrap script
-        run: bash -n scripts/bootstrap_gradle_wrapper.sh app/src/main/assets/bootstrap/dan_bootstrap.sh
+        run: bash -n scripts/bootstrap_gradle_wrapper.sh scripts/run_android_acceptance.sh scripts/verify_release_candidate.sh app/src/main/assets/bootstrap/dan_bootstrap.sh
       - name: Test bootstrap success and failure
         run: python3 scripts/test_bootstrap.py
+      - name: Test emulator acceptance runner
+        run: python3 scripts/test_android_acceptance_runner.py
+      - name: Test acceptance report and retry regressions
+        run: python3 scripts/test_android_acceptance_regressions.py
+      - name: Test release verification gates
+        run: bash scripts/tests/test_verify_release_candidate.sh
       - name: Check whitespace
         run: git diff --check
 
   build:
-    runs-on: ubuntu-latest
+    # Linux runner has no /dev/kvm; run Android emulator acceptance on accelerated macOS.
+    runs-on: macos-15-intel
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -68,7 +77,105 @@ jobs:
           if-no-files-found: error
 
       - name: Compile and unit test
-        run: ./gradlew :app:assembleDebug testDebugUnitTest lintDebug --continue --stacktrace --no-daemon
+        run: ./gradlew :app:assembleDebug :app:assemblePreview :app:assembleDebugAndroidTest testDebugUnitTest lintDebug --continue --stacktrace --no-daemon
+
+      - name: Verify side-by-side development package
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt -print -quit)"
+          test -x "$AAPT"
+          "$AAPT" dump badging "$APK" > "$RUNNER_TEMP/dan-apk-badging.txt"
+          grep -Fq "package: name='com.dan.terminal.dev' " "$RUNNER_TEMP/dan-apk-badging.txt"
+          grep -Fq "application-label:'DAN Terminal Dev'" "$RUNNER_TEMP/dan-apk-badging.txt"
+          grep -Fq "launchable-activity: name='com.dan.terminal.MainActivity'" "$RUNNER_TEMP/dan-apk-badging.txt"
+          "$AAPT" dump badging app/build/outputs/apk/preview/app-preview.apk > "$RUNNER_TEMP/dan-preview-badging.txt"
+          grep -Fq "package: name='com.dan.terminal.preview' " "$RUNNER_TEMP/dan-preview-badging.txt"
+          grep -Fq "application-label:'DAN Terminal Preview'" "$RUNNER_TEMP/dan-preview-badging.txt"
+
+      - name: Retain debug APK before emulator acceptance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dan-terminal-dev-debug-unverified
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: warn
+
+      - name: Retain side-by-side Preview APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dan-terminal-preview-fonts-phone-unverified
+          path: app/build/outputs/apk/preview/app-preview.apk
+          if-no-files-found: warn
+
+      - name: Run PTY acceptance test on Android 16 emulator
+        id: acceptance
+        continue-on-error: true
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          DAN_ACCEPTANCE_ATTEMPT: first
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          avd-name: dan-api36-first
+          emulator-boot-timeout: 900
+          disable-animations: true
+          script: bash scripts/run_android_acceptance.sh
+
+      - name: Classify emulator startup failure
+        id: boot_failure
+        if: steps.acceptance.outcome == 'failure'
+        shell: bash
+        run: |
+          python3 scripts/verify_android_acceptance.py classify \
+            --diagnostics "$RUNNER_TEMP/dan-terminal-emulator-diagnostics/first" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Retry emulator startup once
+        id: acceptance_retry
+        if: steps.boot_failure.outputs.retry == 'true'
+        continue-on-error: true
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          DAN_ACCEPTANCE_ATTEMPT: retry
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          avd-name: dan-api36-retry
+          emulator-port: 5556
+          force-avd-creation: true
+          emulator-boot-timeout: 900
+          disable-animations: true
+          script: bash scripts/run_android_acceptance.sh
+
+      - name: Require passing PTY acceptance
+        if: always() && steps.acceptance.outcome != 'skipped'
+        env:
+          FIRST: ${{ steps.acceptance.outcome }}
+          RETRY: ${{ steps.acceptance_retry.outcome }}
+        run: |
+          [[ "$FIRST" == success || "$RETRY" == success ]] || {
+            echo "::error::Android 16 PTY acceptance did not pass."
+            exit 1
+          }
+
+      - name: Upload instrumented results and emulator diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dan-terminal-instrumented-test-reports
+          path: |
+            app/build/reports/androidTests/**
+            app/build/outputs/androidTest-results/**
+            ${{ runner.temp }}/dan-terminal-emulator-diagnostics/**
+          if-no-files-found: warn
 
       - name: Upload test and lint reports
         if: always()
@@ -79,10 +186,3 @@ jobs:
             **/build/reports/
             **/build/test-results/
           if-no-files-found: warn
-
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: dan-terminal-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error

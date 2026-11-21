@@ -31,4 +31,8 @@ class BleAdvertisementTest {
         `when`(result.isConnectable).thenReturn(false)
         assertFalse(result.toBleDevice().isConnectable)
     }
+    @Test fun unnamedAdvertisementDoesNotReadProtectedDeviceName() {
+        assertEquals("Unnamed device", result.toBleDevice().displayName)
+        verify(device, never()).name
+    }
 }

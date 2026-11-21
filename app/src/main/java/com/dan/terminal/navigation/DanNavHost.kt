@@ -1,6 +1,7 @@
 package com.dan.terminal.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -17,12 +18,20 @@ import com.dan.terminal.di.LocalAppContainer
 import com.dan.terminal.feature.bluetooth.BluetoothScreen
 import com.dan.terminal.feature.bluetooth.GattScreen
 import com.dan.terminal.feature.shizuku.ShizukuScreen
+import com.dan.terminal.feature.network.NetworkDiagnosticsScreen
 import com.dan.terminal.feature.termux.TermuxScreen
+import com.dan.terminal.feature.termux.TerminalConsoleScreen
+import com.dan.terminal.feature.termux.LocalShellScreen
 import com.dan.terminal.ui.HomeScreen
 
 @Composable
 fun DanNavHost() {
     val navController = rememberNavController()
+    val context = LocalContext.current
+    val preferences = remember(context) { context.getSharedPreferences("dan_terminal_setup", 0) }
+    val initialRoute = remember(preferences) {
+        terminalStartRoute(preferences.getBoolean("setup_completed", false))
+    }
     val container = LocalAppContainer.current
     val activeRequirement by container.accessCoordinator
         .activeRequirement
@@ -52,12 +61,20 @@ fun DanNavHost() {
         )
     }
 
-    NavHost(navController = navController, startDestination = "home") {
+    NavHost(navController = navController, startDestination = initialRoute) {
         composable("home") {
             HomeScreen(
                 onBluetooth = { navController.navigate("bluetooth") },
                 onShizuku = { navController.navigate("shizuku") },
-                onTermux = { navController.navigate("termux") }
+                onTermux = { navController.navigate("termux") },
+                onNetworkDiagnostics = { navController.navigate("network") },
+                onConsole = {
+                    preferences.edit().putBoolean("setup_completed", true).apply()
+                    navController.navigate("shell") {
+                        popUpTo("home") { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
             )
         }
         composable("bluetooth") {
@@ -76,5 +93,15 @@ fun DanNavHost() {
         }
         composable("shizuku") { ShizukuScreen() }
         composable("termux") { TermuxScreen() }
+        composable("network") { NetworkDiagnosticsScreen(onBack = { navController.popBackStack() }) }
+        composable("shell") {
+            LocalShellScreen(
+                onSettings = { navController.navigate("home") },
+                onLegacyConsole = { navController.navigate("console") }
+            )
+        }
+        composable("console") {
+            TerminalConsoleScreen(onBack = { navController.navigate("home") { launchSingleTop = true } })
+        }
     }
 }

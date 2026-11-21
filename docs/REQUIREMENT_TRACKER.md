@@ -1,7 +1,7 @@
 # DAN Terminal — Requirement Tracker
 
 Authoritative register: DAN_Terminal_Master_Features_v1_1.xlsx (95 requirements).
-Status rule: DONE requires the register acceptance test to pass. No acceptance tests have run in this environment.
+Status rule: DONE requires each requirement's acceptance test to pass. CI evidence is tracked in docs/IMPLEMENTATION_STATUS.md; physical Redmi checks remain pending.
 
 | ID | Requirement | Priority | Milestone | Status | Evidence / gap |
 |---|---|---:|---|---|---|
@@ -30,8 +30,8 @@ Status rule: DONE requires the register acceptance test to pass. No acceptance t
 | R07 | Service, log and resource monitoring | P2 | M4 | TODO | Outside the M0/M1 source baseline; not implemented or acceptance-tested. |
 | R08 | Hardware-backed credential management | P0 | M0 + M4 | TODO | Outside the M0/M1 source baseline; not implemented or acceptance-tested. |
 | H01 | Bluetooth Classic and BLE scanner | P0 | M1 | PARTIAL | BLE scan source exists; Bluetooth Classic/bonded-device handling and target-device acceptance are missing. |
-| H02 | GATT discovery and permitted device control | P0 | M1 | PARTIAL | Connect, service discovery and read callback exist; read/write/notify UI and per-write approval are missing. |
-| H03 | Wi-Fi discovery and diagnostics | P2 | M5 | TODO | Outside the M0/M1 source baseline; not implemented or acceptance-tested. |
+| H02 | GATT discovery and permitted device control | P0 | M1 | PARTIAL | Connect, service discovery and read callback exist. A pure per-write approval policy and denial-zero-write unit test are added in source but are unrun and not wired to transport; write/notify UI remains missing. |
+| H03 | Wi-Fi discovery and diagnostics | P2 | M5 | PARTIAL | User-triggered connectivity diagnostic, local history, and CSV/PDF export source added; tests/build and Redmi behavior are unverified. This does not discover LAN devices or detect new devices. |
 | H04 | USB-OTG serial console | P2 | M5 | TODO | Outside the M0/M1 source baseline; not implemented or acceptance-tested. |
 | H05 | NFC reader and tag tools | P2 | M5 | TODO | Outside the M0/M1 source baseline; not implemented or acceptance-tested. |
 | H06 | Sensors, battery and system monitoring | P2 | M5 | TODO | Outside the M0/M1 source baseline; not implemented or acceptance-tested. |

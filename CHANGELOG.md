@@ -12,6 +12,8 @@ All notable changes to this project are documented here.
 - Added a more actionable Termux dispatch failure message.
 - Corrected Termux RUN_COMMAND executable-path and argument separation.
 - Added a GATT read-value cache for API 33+ and the legacy callback.
+- Added an M3.1 app-owned PTY shell with a device/emulator acceptance test; execution is pending.
+- Added M3.1 app-owned PTY shell service using the separately licensed Termux terminal-view/emulator libraries; emulator acceptance test added, execution pending.
 
 ### Fixed
 - Reviewed Shizuku service/permission recovery, denial handling, callback synchronization and listener lifecycle (source only; H08/P01/P02/P04).
