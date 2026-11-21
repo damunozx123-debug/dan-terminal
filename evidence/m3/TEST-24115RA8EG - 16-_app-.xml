@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuite name="com.dan.terminal.terminal.PtyTerminalServiceTest" tests="3" failures="0" errors="0" skipped="0" time="9.563" timestamp="2026-11-21T11:00:12" hostname="localhost">
+  <properties>
+    <property name="device" value="24115RA8EG - 16" />
+    <property name="flavor" value="" />
+    <property name="project" value=":app" />
+  </properties>
+  <testcase name="serviceOwnsInteractivePtyAcrossInputResizeAndInterrupt" classname="com.dan.terminal.terminal.PtyTerminalServiceTest" time="0.472" />
+  <testcase name="exitedShellCanBeRestartedAsAFreshSession" classname="com.dan.terminal.terminal.PtyTerminalServiceTest" time="0.104" />
+  <testcase name="exactly80ColumnsThenWrapDoesNotAddressColumn80" classname="com.dan.terminal.terminal.PtyTerminalServiceTest" time="7.614" />
+</testsuite>
