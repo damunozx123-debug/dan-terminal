@@ -3,7 +3,6 @@ package com.dan.terminal.feature.ssh
 import android.os.Handler
 import android.os.Looper
 import com.termux.terminal.TerminalEmulator
-import com.termux.terminal.TerminalOutput
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -65,26 +64,17 @@ internal class NativeSshController {
     var redraw: (() -> Unit)? = null
     var title: String = "BlackArch"
 
-    private val terminalOutput = object : TerminalOutput() {
-        override fun write(data: ByteArray, offset: Int, count: Int) {
-            if (count > 0) sendBytes(data.copyOfRange(offset, offset + count))
-        }
+    private val terminalOutput = NativeSshTerminalOutput(
+        object : NativeSshTerminalOutput.Callback {
+            override fun onWrite(bytes: ByteArray, offset: Int, count: Int) {
+                if (count > 0) sendBytes(bytes.copyOfRange(offset, offset + count))
+            }
 
-        override fun titleChanged(oldTitle: String?, newTitle: String?) {
-            title = newTitle.orEmpty().take(80)
+            override fun onRedraw() {
+                redraw?.invoke()
+            }
         }
-
-        override fun onCopyTextToClipboard(text: String?) {
-            // A remote host cannot silently write into the Android clipboard.
-        }
-
-        override fun onPasteTextFromClipboard() {
-            // Explicit paste UI is a future feature; ignore remote clipboard requests.
-        }
-
-        override fun onBell() = Unit
-        override fun onColorsChanged() { redraw?.invoke() }
-    }
+    )
 
     /** The emulator is mutated only on the Android main/UI thread. */
     val emulator: TerminalEmulator =
