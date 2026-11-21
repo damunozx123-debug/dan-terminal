@@ -18,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.printToString
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -283,7 +284,7 @@ class TerminalViewAcceptanceTest {
             ).joinToString("; ")
         }
         val semantics = runCatching {
-            compose.onRoot(useUnmergedTree = true).fetchSemanticsNode().toString().take(2400)
+            compose.onRoot(useUnmergedTree = true).printToString(maxDepth = 8).take(2400)
         }.getOrElse { "Unavailable: ${it.javaClass.simpleName}: ${it.message}" }
         throw AssertionError(
             "Terminal view did not reach expected state through Android input. " +
