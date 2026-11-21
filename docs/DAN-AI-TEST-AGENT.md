@@ -40,7 +40,7 @@ ChatGPT can retrieve PR comments through the connected GitHub app after a conver
 
 The default 20:00 daily timer is too slow for active development. The optional
 watcher uses inotify (not polling) to detect Android source or Gradle config edits,
-waits 10 seconds without another change, and runs a local quick build + unit gate.
+waits 10 seconds without another change, and runs a local quick build + unit gate. Passing tests skip Ollama analysis by default, keeping feedback fast; failures trigger local AI diagnosis. Use --analyze-passes only when you explicitly want AI commentary on successful runs.
 It does not touch the phone; run UI/full instrumented tests explicitly.
 
     sudo pacman -S --needed inotify-tools
