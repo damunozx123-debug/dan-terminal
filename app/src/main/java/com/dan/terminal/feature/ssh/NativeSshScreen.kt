@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
@@ -33,7 +32,8 @@ import androidx.compose.ui.unit.dp
 /** Native in-app SSH; does not launch Termux or load its private key. */
 @Composable
 fun NativeSshScreen(onBack: () -> Unit) {
-    val controller = remember { NativeSshController() }
+    var generation by remember { mutableIntStateOf(0) }
+    val controller = remember(generation) { NativeSshController() }
     DisposableEffect(controller) {
         onDispose { controller.disconnect() }
     }
@@ -57,7 +57,7 @@ fun NativeSshScreen(onBack: () -> Unit) {
                 style = MaterialTheme.typography.titleSmall
             )
             if (connected) {
-                TextButton(onClick = { controller.disconnect() }) { Text("Disconnect") }
+                TextButton(onClick = { generation += 1 }) { Text("Disconnect") }
             }
         }
 
