@@ -1,8 +1,8 @@
 [Unit]
 Description=Read-only DAN Android lab evidence audit
-Wants=network-online.target
-After=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=%h/dan-terminal/scripts/dan-lab-audit.sh
+UMask=0077
+TimeoutStartSec=5min
+ExecStart=/usr/bin/env bash %h/dan-terminal/scripts/dan-lab-audit.sh
