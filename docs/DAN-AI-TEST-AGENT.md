@@ -11,6 +11,24 @@ Runs Gradle tests on BlackArch, analyzes a bounded log excerpt through local Oll
 
 Keep Ollama bound to localhost and authenticate GitHub CLI under your own account. The agent needs no cloud AI keys.
 
+If Pacman fails with "ollama: /usr/share/ollama exists in filesystem" but
+"ollama pull" and "ollama list" work, do NOT delete or overwrite the
+directory. The installation may already be managed by another method.
+Check:
+
+    command -v ollama
+    ollama list
+    pacman -Qo /usr/share/ollama || true
+    curl -fsS http://127.0.0.1:11434/api/tags
+
+Install the other packages separately without listing ollama:
+
+    sudo pacman -S --needed python github-cli android-tools
+
+The one-shot test service does not need the Pacman Ollama package if the
+existing local Ollama API already answers.
+
+
 ## Commands
 
     cd /home/dan/dan-terminal-m3-verify
@@ -62,7 +80,7 @@ Gradle log using Ollama, and the user-opted-in service configuration posts
 a bounded report to GitHub PR #20. The quick test itself does **not wait**
 for AI text generation or GitHub publication. Logs remain on disk.
 
-On successful builds, no AI analysis or GitHub upload is performed. The
+On successful builds, no AI analysis or GitHub upload is performed. On failures, the separate Ollama call requests model unload with keep_alive=0 when generation finishes. The
 previous edit watcher and nightly timer are **disabled** by the installer to
 avoid duplicating jobs. No ADB-connected tests are run automatically.
 
