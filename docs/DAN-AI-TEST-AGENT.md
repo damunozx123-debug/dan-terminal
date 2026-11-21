@@ -36,6 +36,39 @@ In ChatGPT, send a message such as:
 
 ChatGPT can retrieve PR comments through the connected GitHub app after a conversation turn. The script does not push messages into the current chat, nor can the local AI apply code changes or merges.
 
+## Fast unattended tests: run after source edits (recommended)
+
+The default 20:00 daily timer is too slow for active development. The optional
+watcher uses inotify (not polling) to detect Android source or Gradle config edits,
+waits 10 seconds without another change, and runs a local quick build + unit gate.
+It does not touch the phone; run UI/full instrumented tests explicitly.
+
+    sudo pacman -S --needed inotify-tools
+    mkdir -p ~/.config/systemd/user
+    cp tools/systemd/dan-ai-test-watch.service ~/.config/systemd/user/
+    systemctl --user daemon-reload
+    systemctl --user enable --now dan-ai-test-watch.service
+    journalctl --user -u dan-ai-test-watch -f
+
+When the watcher is opt-in enabled, the service uses --publish-failures,
+publishing ONLY failed/incomplete summary reports to GitHub PR #20.
+A passing run is saved locally and not published, avoiding comment spam.
+Review the published report format before enabling this service, especially
+when PR #20 is public: redaction is best effort.
+
+For initial local-only observation without posting to GitHub:
+
+    python tools/dan_ai_test_watch.py --debounce 10
+
+Stop/disable unattended testing:
+
+    systemctl --user disable --now dan-ai-test-watch.service
+
+This watcher responds to edits under app/src, core/*/src, feature/*/src,
+gradle/ and repository-root build configuration. It doesn't react to ordinary
+Gradle build output. It may queue another quick test if files change while the
+current test run is executing; this avoids silently missing edits.
+
 ## Optional unattended quick tests (opt in)
 
 The included user timer runs a quick test at 20:00 machine-local time and posts the short report. Nothing in this pull request enables it.
