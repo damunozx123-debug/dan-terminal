@@ -77,3 +77,7 @@ A fresh user-supplied screenshot from installed `com.dan.terminal.dev` shows the
 ### Ctrl+C interruption — physical Redmi, 21 November 2026
 
 A follow-up user screenshot of `com.dan.terminal.dev` shows `sleep 30` interrupted by on-screen **Ctrl+C** twice. Both attempts display `^C`, shell status `130`, and a usable prompt following interruption. Mark the **Ctrl+C foreground interruption and shell usability** check **PASS (user-observed)**. This is not evidence of long-running job lifecycle/background recovery. Terminal text remains extremely small in this installed build.
+
+### Initial terminal geometry — physical Redmi, 21 November 2026
+
+Screenshot from the interactive app-owned terminal shows `stty size` returning **`54 114`** (54 rows, 114 columns) in portrait with the Android soft keyboard visible. This verifies a reported PTY size but **does not yet establish dynamic resize handling**. Landscape/rotation comparison and SIGWINCH-driven resize are still **NOT TESTED**. The small terminal font is still visible; 114 columns in portrait is not evidence that terminal readability is acceptable.
