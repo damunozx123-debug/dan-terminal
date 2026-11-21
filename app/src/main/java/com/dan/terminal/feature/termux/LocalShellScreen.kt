@@ -28,6 +28,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -44,6 +45,7 @@ import androidx.compose.ui.text.font.FontFamily
 import com.termux.terminal.TerminalSession
 import com.termux.view.TerminalView
 import com.termux.view.TerminalViewClient
+import kotlinx.coroutines.delay
 
 @Composable
 fun LocalShellScreen(
@@ -66,6 +68,7 @@ fun LocalShellScreen(
     var binder by remember { mutableStateOf<PtyTerminalService.LocalBinder?>(null) }
     var serviceError by remember { mutableStateOf<String?>(null) }
     var retentionWarning by remember { mutableStateOf<String?>(null) }
+    var reconnectAttempt by remember { mutableIntStateOf(0) }
     val connection = remember(context) {
         object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -75,27 +78,42 @@ fun LocalShellScreen(
 
             override fun onServiceDisconnected(name: ComponentName?) {
                 binder = null
-                serviceError = "PTY service disconnected. Reopen the terminal to start a new session."
+                serviceError = "PTY service disconnected."
+            }
+
+            override fun onNullBinding(name: ComponentName?) {
+                binder = null
+                serviceError = "PTY service returned a null binding."
+            }
+
+            override fun onBindingDied(name: ComponentName?) {
+                binder = null
+                serviceError = "PTY service binding died."
             }
         }
     }
 
-    DisposableEffect(context, connection) {
+    DisposableEffect(context, connection, reconnectAttempt) {
         val intent = Intent(context, PtyTerminalService::class.java)
         var isBound = false
-        // Android can reject startService() even when an activity is allowed to
-        // bind. Do not skip the BIND_AUTO_CREATE attempt on that error.
-        val started = try {
-            context.startService(intent) != null
-        } catch (_: RuntimeException) {
-            false
-        }
-        retentionWarning = if (started) null else
-            "Shell may stop after leaving this screen: persistent service start was unavailable."
+        binder = null
+        serviceError = null
+        // Establish the app-local binding first. An independent startService()
+        // call must not prevent or delay the UI from binding to the session.
         try {
             isBound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
-            if (!isBound) serviceError = "Unable to bind to the app-owned PTY service."
-        } catch (error: Exception) {
+            if (!isBound) {
+                serviceError = "Unable to bind to the app-owned PTY service."
+            } else {
+                val started = try {
+                    context.startService(intent) != null
+                } catch (_: RuntimeException) {
+                    false
+                }
+                retentionWarning = if (started) null else
+                    "Shell may stop after leaving this screen: persistent service start was unavailable."
+            }
+        } catch (error: RuntimeException) {
             serviceError = "Unable to bind PTY service: ${error.message ?: "unknown error"}"
         }
         onDispose {
@@ -103,9 +121,24 @@ fun LocalShellScreen(
         }
     }
 
+    LaunchedEffect(binder, serviceError, reconnectAttempt) {
+        if (binder == null && serviceError == null) {
+            delay(4000)
+            if (binder == null && serviceError == null) {
+                if (reconnectAttempt == 0) {
+                    reconnectAttempt = 1
+                } else {
+                    serviceError = "PTY service did not connect. Retry the connection."
+                }
+            }
+        }
+    }
+
     val revision = binder?.screenUpdates?.collectAsState()?.value
     val pendingPaste = binder?.pendingClipboardPaste?.collectAsState()?.value
-    val session = binder?.sessionOrNull()
+    val sessionResult = binder?.let { runCatching { it.session } }
+    val session = sessionResult?.getOrNull()
+    val sessionError = sessionResult?.exceptionOrNull()?.message
     Column(Modifier.fillMaxSize().imePadding().padding(12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("DAN Terminal", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
@@ -161,8 +194,14 @@ fun LocalShellScreen(
         }
         Box(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp)) {
             when {
-                serviceError != null -> Text(serviceError!!, color = MaterialTheme.colorScheme.error)
-                session == null -> Text("Starting interactive shell…")
+                serviceError != null || sessionError != null -> Column {
+                    Text(
+                        serviceError ?: "PTY session initialization failed: ${sessionError ?: "unknown error"}",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    TextButton(onClick = { reconnectAttempt += 1 }) { Text("Retry connection") }
+                }
+                session == null -> Text("Connecting to PTY service…")
                 else -> AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { viewContext ->
@@ -216,9 +255,6 @@ fun LocalShellScreen(
         )
     }
 }
-
-private fun PtyTerminalService.LocalBinder.sessionOrNull(): TerminalSession? =
-    runCatching { session }.getOrNull()
 
 private class PtyTerminalViewClient(private val view: TerminalView) : TerminalViewClient {
     override fun onScale(scale: Float): Float = scale
