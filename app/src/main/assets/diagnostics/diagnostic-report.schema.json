@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/damunozx123-debug/net-intel-app-v9/blob/diagnostics-contract-v1.0.0/contracts/diagnostics/v1/diagnostic-report.schema.json",
+  "title": "DAN DiagnosticReport v1",
+  "description": "Imported records are untrusted even when schema-valid; this schema does not confer authorization or authorship.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "report_id",
+    "report_type",
+    "producer",
+    "created_at_utc",
+    "measurement_origin",
+    "status",
+    "measurements",
+    "findings",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "report_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "report_type": {
+      "type": "string",
+      "enum": [
+        "connectivity",
+        "wifi_audit",
+        "lan_inventory",
+        "ble_audit"
+      ]
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "app_id",
+        "app_version"
+      ],
+      "properties": {
+        "app_id": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 128
+        },
+        "app_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        }
+      }
+    },
+    "created_at_utc": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(?:\\.\\d{1,9})?Z$"
+    },
+    "measurement_origin": {
+      "type": "string",
+      "enum": [
+        "LIVE",
+        "SIMULATED"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "COMPLETE",
+        "PARTIAL",
+        "FAILED",
+        "INSUFFICIENT_DATA"
+      ]
+    },
+    "measurements": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label",
+          "method",
+          "unit",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{1,63}$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "tcp_connect",
+              "dns_lookup",
+              "android_wifi",
+              "derived"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "ms",
+              "dBm",
+              "percent",
+              "count",
+              "none"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "MEASURED",
+              "UNMEASURED",
+              "DENIED",
+              "UNSUPPORTED",
+              "TIMEOUT",
+              "ERROR"
+            ]
+          },
+          "value": {
+            "type": "number"
+          },
+          "reason_code": {
+            "type": "string",
+            "enum": [
+              "NOT_RECORDED",
+              "PERMISSION_DENIED",
+              "PLATFORM_UNSUPPORTED",
+              "DEADLINE_EXCEEDED",
+              "MEASUREMENT_FAILED"
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "MEASURED"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "required": [
+                "value"
+              ],
+              "not": {
+                "required": [
+                  "reason_code"
+                ]
+              }
+            },
+            "else": {
+              "required": [
+                "reason_code"
+              ],
+              "not": {
+                "required": [
+                  "value"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "code",
+          "message",
+          "supporting_measurement_ids"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{1,63}$"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]{1,63}$"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "supporting_measurement_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 128,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]{1,63}$"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        }
+      }
+    }
+  }
+}
