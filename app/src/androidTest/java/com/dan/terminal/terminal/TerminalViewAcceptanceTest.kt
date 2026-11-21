@@ -248,6 +248,11 @@ class TerminalViewAcceptanceTest {
     private fun await(scenario: ActivityScenario<MainActivity>, predicate: (TerminalView) -> Boolean) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(12)
         while (System.nanoTime() < deadline) {
+            // ActivityScenario.onActivity() alone does not advance Compose's
+            // test clock. Without this synchronization the AndroidView factory
+            // can run only AFTER our timeout, when onRoot() is called below.
+            // Synchronize before inspecting the native Android view hierarchy.
+            compose.waitForIdle()
             var matched = false
             scenario.onActivity { activity ->
                 findTerminal(activity.window.decorView)?.let { matched = predicate(it) }
