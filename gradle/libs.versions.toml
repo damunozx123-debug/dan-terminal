@@ -13,6 +13,7 @@ androidxJunit = "1.2.1"
 espresso = "3.6.1"
 androidxTestRules = "1.6.1"
 termuxTerminal = "0.118.0"
+sshj = "0.41.2"
 mockito = "5.15.2"
 
 [libraries]
@@ -39,6 +40,7 @@ androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "a
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }
 androidx-test-rules = { group = "androidx.test", name = "rules", version.ref = "androidxTestRules" }
 termux-terminal-view = { group = "com.termux.termux-app", name = "terminal-view", version.ref = "termuxTerminal" }
+sshj = { group = "com.hierynomus", name = "sshj", version.ref = "sshj" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
 
