@@ -74,6 +74,19 @@ fun GattScreen(
             modifier = Modifier.fillMaxWidth()
         ) { Text("Disconnect") }
 
+        if (state is GattConnectionState.Connected || state is GattConnectionState.Services) {
+            // Android may report battery for paired devices; not every BLE device exposes it.
+            val reportedLevel = if (container.permissionBroker.isBluetoothConnectGranted()) {
+                runCatching { device?.raw?.batteryLevel }.getOrNull()
+            } else null
+            val battery = reportedLevel?.takeIf { it in 0..100 }
+            Text(
+                "Connected device battery (Android-reported): " +
+                    (battery?.let { "$it%" } ?: "Not reported"),
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+
         when (val current = state) {
             is GattConnectionState.Services -> {
                 LazyColumn(modifier = Modifier.weight(1f)) {
