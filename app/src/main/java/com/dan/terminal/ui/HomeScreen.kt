@@ -20,7 +20,8 @@ import com.dan.terminal.di.LocalAppContainer
 fun HomeScreen(
     onBluetooth: () -> Unit,
     onShizuku: () -> Unit,
-    onTermux: () -> Unit
+    onTermux: () -> Unit,
+    onTools: () -> Unit
 ) {
     val container = LocalAppContainer.current
     val shizuku by container.shizukuManager.state.collectAsState()
@@ -50,6 +51,9 @@ fun HomeScreen(
         }
         Button(onClick = onTermux, modifier = Modifier.fillMaxWidth()) {
             Text("Termux runtime bootstrap")
+        }
+        Button(onClick = onTools, modifier = Modifier.fillMaxWidth()) {
+            Text("Security tools (Termux + Debian)")
         }
     }
 }
