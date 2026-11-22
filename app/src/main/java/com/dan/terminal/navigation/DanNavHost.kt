@@ -23,6 +23,7 @@ import com.dan.terminal.feature.termux.TermuxScreen
 import com.dan.terminal.feature.termux.TerminalConsoleScreen
 import com.dan.terminal.feature.termux.LocalShellScreen
 import com.dan.terminal.feature.ssh.NativeSshScreen
+import com.dan.terminal.feature.settings.DeviceConnectionSettingsScreen
 import com.dan.terminal.ui.HomeScreen
 
 @Composable
@@ -97,9 +98,17 @@ fun DanNavHost() {
         composable("network") { NetworkDiagnosticsScreen(onBack = { navController.popBackStack() }) }
         composable("shell") {
             LocalShellScreen(
-                onSettings = { navController.navigate("home") },
+                onSettings = { navController.navigate("device-settings") },
                 onLegacyConsole = { navController.navigate("console") },
                 onNativeSsh = { navController.navigate("native-ssh") }
+            )
+        }
+        composable("device-settings") {
+            DeviceConnectionSettingsScreen(
+                onBack = { navController.popBackStack() },
+                onNativeSsh = { navController.navigate("native-ssh") },
+                onBluetooth = { navController.navigate("bluetooth") },
+                onDiagnostics = { navController.navigate("network") }
             )
         }
         composable("native-ssh") { NativeSshScreen(onBack = { navController.popBackStack() }) }
