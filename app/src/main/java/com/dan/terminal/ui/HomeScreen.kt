@@ -22,7 +22,8 @@ fun HomeScreen(
     onShizuku: () -> Unit,
     onTermux: () -> Unit,
     onConsole: () -> Unit,
-    onNetworkDiagnostics: () -> Unit
+    onNetworkDiagnostics: () -> Unit,
+    onDeviceSettings: () -> Unit
 ) {
     val container = LocalAppContainer.current
     val shizuku by container.shizukuManager.state.collectAsState()
