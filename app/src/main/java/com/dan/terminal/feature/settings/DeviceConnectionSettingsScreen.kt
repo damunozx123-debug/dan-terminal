@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -173,6 +174,21 @@ fun DeviceConnectionSettingsScreen(
         Button(onClick = onNativeSsh, modifier = Modifier.fillMaxWidth()) {
             Text("Open secure BlackArch SSH")
         }
+        OutlinedButton(
+            onClick = {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("http://127.0.0.1:8765"))
+                message = if (runCatching { context.startActivity(intent) }.isSuccess) {
+                    "Control Deck opened. If offline, first start the SSH tunnel in Termux."
+                } else {
+                    "No browser available. Start an SSH tunnel, then open localhost:8765."
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Launch DAN Control Deck") }
+        Text(
+            "For the mini-desktop, keep this Termux tunnel open: ssh -N -L 8765:127.0.0.1:8765 dan@100.72.159.123",
+            style = MaterialTheme.typography.bodySmall
+        )
         Text("Requires your independently verified SSH host fingerprint. Remote laptop battery is not available until an authenticated status feed is connected.",
             style = MaterialTheme.typography.bodySmall)
         Text("Phone connection controls", style = MaterialTheme.typography.titleMedium)
