@@ -1,7 +1,5 @@
 package com.dan.terminal.feature.bluetooth
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,6 +13,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,41 +21,66 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.dan.terminal.core.bluetooth.BleDevice
 import com.dan.terminal.core.security.AccessCapability
 import com.dan.terminal.di.LocalAppContainer
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 @Composable
 fun BluetoothScreen(onDeviceSelected: (BleDevice) -> Unit) {
     val container = LocalAppContainer.current
     val scope = rememberCoroutineScope()
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { }
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     var devices by remember { mutableStateOf<List<BleDevice>>(emptyList()) }
     var scanning by remember { mutableStateOf(false) }
     var scanJob by remember { mutableStateOf<Job?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var scanGeneration by remember { mutableStateOf(0) }
+
+    fun stopScan() {
+        scanGeneration++
+        scanJob?.cancel()
+        scanJob = null
+        scanning = false
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) stopScan()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            stopScan()
+        }
+    }
 
     fun startScan() {
         if (!container.accessCoordinator.require(AccessCapability.BLUETOOTH_SCAN)) return
-        if (!container.permissionBroker.isBluetoothScanGranted()) {
-            permissionLauncher.launch(container.permissionBroker.bluetoothPermissions())
-            return
-        }
+        stopScan()
+        val generation = scanGeneration
         scanning = true
         error = null
         devices = emptyList()
         scanJob = scope.launch {
-            runCatching {
+            try {
                 container.bleScanner.scan().collect { device ->
                     devices = (devices.filterNot { it.address == device.address } + device)
                         .sortedByDescending { it.rssi }
                 }
-            }.onFailure { error = it.message }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                if (scanGeneration == generation) error = failure.message ?: "BLE scan failed. Try again."
+            } finally {
+                if (scanGeneration == generation) scanning = false
+            }
         }
     }
 
@@ -72,8 +96,7 @@ fun BluetoothScreen(onDeviceSelected: (BleDevice) -> Unit) {
         Button(
             onClick = {
                 if (scanning) {
-                    scanJob?.cancel()
-                    scanning = false
+                    stopScan()
                 } else {
                     startScan()
                 }
@@ -82,17 +105,21 @@ fun BluetoothScreen(onDeviceSelected: (BleDevice) -> Unit) {
         ) { Text(if (scanning) "Stop scan" else "Start scan") }
         error?.let { Text("Error: $it", color = MaterialTheme.colorScheme.error) }
         LazyColumn(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(devices, key = { it.address }) { device ->
                 Card(
-                    modifier = Modifier.fillMaxWidth().clickable { onDeviceSelected(device) }
+                    modifier = Modifier.fillMaxWidth().clickable(enabled = device.isConnectable) {
+                        stopScan()
+                        onDeviceSelected(device)
+                    }
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(device.displayName, style = MaterialTheme.typography.titleMedium)
                         Text(device.address)
                         Text("RSSI: ${device.rssi} dBm")
+                        if (!device.isConnectable) Text("Broadcast only — no GATT connection")
                         if (device.serviceUuids.isNotEmpty()) {
                             Text("Services: ${device.serviceUuids.size}")
                         }

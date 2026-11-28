@@ -5,7 +5,9 @@ data class ShizukuState(
     val permissionGranted: Boolean = false,
     val version: Int = -1,
     val preV11: Boolean = false,
+    val permissionBlocked: Boolean = false,
+    val permissionRequestPending: Boolean = false,
     val lastError: String? = null
 ) {
-    val ready: Boolean get() = binderAlive && permissionGranted
+    val ready: Boolean get() = binderAlive && permissionGranted && !preV11
 }

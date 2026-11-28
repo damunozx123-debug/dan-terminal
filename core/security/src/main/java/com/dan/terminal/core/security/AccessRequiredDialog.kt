@@ -26,6 +26,9 @@ fun AccessRequiredDialog(
     permissionBroker: PermissionBroker,
     onOpenShizukuApp: () -> Unit,
     onOpenShizukuDownload: () -> Unit,
+    shizukuMessage: String?,
+    shizukuRequestPending: Boolean,
+    onVerify: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -46,6 +49,10 @@ fun AccessRequiredDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(requirement.reason, style = MaterialTheme.typography.bodyMedium)
+                shizukuMessage?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error)
+                }
+                if (shizukuRequestPending) Text("Waiting for your decision in Shizuku.")
                 Spacer(Modifier.height(8.dp))
                 requirement.steps.forEachIndexed { index, step ->
                     Text(
@@ -55,10 +62,12 @@ fun AccessRequiredDialog(
                     Text(step.description, style = MaterialTheme.typography.bodySmall)
                     if (step.action != null) {
                         TextButton(
+                            enabled = step.action != RecoveryAction.REQUEST_SHIZUKU_PERMISSION ||
+                                !shizukuRequestPending,
                             onClick = {
                                 when (step.action) {
                                     RecoveryAction.REQUEST_RUNTIME_PERMISSION ->
-                                        permissionLauncher.launch(permissionBroker.bluetoothPermissions())
+                                        permissionLauncher.launch(permissionBroker.runtimePermissions(requirement.capability))
 
                                     RecoveryAction.REQUEST_SHIZUKU_PERMISSION ->
                                         coordinator.requestShizukuPermission()
@@ -75,7 +84,7 @@ fun AccessRequiredDialog(
                                     RecoveryAction.OPEN_APP_SETTINGS ->
                                         RecoveryIntents.openAppSettings(
                                             context,
-                                            "com.dan.terminal"
+                                            context.packageName
                                         )
 
                                     RecoveryAction.OPEN_TERMUX_DOWNLOAD ->
@@ -85,7 +94,7 @@ fun AccessRequiredDialog(
                                         )
 
                                     RecoveryAction.VERIFY ->
-                                        coordinator.verifyPending()
+                                        onVerify()
 
                                     null -> Unit
                                 }
@@ -98,7 +107,7 @@ fun AccessRequiredDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { coordinator.verifyPending() }) {
+            Button(onClick = onVerify) {
                 Text("Verify")
             }
         },

@@ -1,7 +1,7 @@
 # DAN Terminal — Requirement Tracker
 
 Authoritative register: DAN_Terminal_Master_Features_v1_1.xlsx (95 requirements).
-Status rule: DONE requires the register acceptance test to pass. No acceptance tests have run in this environment.
+Status rule: DONE requires each requirement's acceptance test to pass. CI evidence is tracked in docs/IMPLEMENTATION_STATUS.md; physical Redmi checks remain pending.
 
 | ID | Requirement | Priority | Milestone | Status | Evidence / gap |
 |---|---|---:|---|---|---|
@@ -30,13 +30,13 @@ Status rule: DONE requires the register acceptance test to pass. No acceptance t
 | R07 | Service, log and resource monitoring | P2 | M4 | TODO | Outside the M0/M1 source baseline; not implemented or acceptance-tested. |
 | R08 | Hardware-backed credential management | P0 | M0 + M4 | TODO | Outside the M0/M1 source baseline; not implemented or acceptance-tested. |
 | H01 | Bluetooth Classic and BLE scanner | P0 | M1 | PARTIAL | BLE scan source exists; Bluetooth Classic/bonded-device handling and target-device acceptance are missing. |
-| H02 | GATT discovery and permitted device control | P0 | M1 | PARTIAL | Connect, service discovery and read callback exist; read/write/notify UI and per-write approval are missing. |
-| H03 | Wi-Fi discovery and diagnostics | P2 | M5 | TODO | Outside the M0/M1 source baseline; not implemented or acceptance-tested. |
+| H02 | GATT discovery and permitted device control | P0 | M1 | PARTIAL | Connect, service discovery and read callback exist. A pure per-write approval policy and denial-zero-write unit test are added in source but are unrun and not wired to transport; write/notify UI remains missing. |
+| H03 | Wi-Fi discovery and diagnostics | P2 | M5 | PARTIAL | User-triggered connectivity diagnostic, local history, and CSV/PDF export source added; tests/build and Redmi behavior are unverified. This does not discover LAN devices or detect new devices. |
 | H04 | USB-OTG serial console | P2 | M5 | TODO | Outside the M0/M1 source baseline; not implemented or acceptance-tested. |
 | H05 | NFC reader and tag tools | P2 | M5 | TODO | Outside the M0/M1 source baseline; not implemented or acceptance-tested. |
 | H06 | Sensors, battery and system monitoring | P2 | M5 | TODO | Outside the M0/M1 source baseline; not implemented or acceptance-tested. |
 | H07 | Android API command bridge | P0 | M1 | TODO | No typed Android command broker. |
-| H08 | Built-in Shizuku-compatible Android privilege manager with optional ADB/root extension | P0 | M1 + M7 | PARTIAL | Official Shizuku API status and permission request exist; embedded service flow and effective privilege checks are missing. |
+| H08 | Built-in Shizuku-compatible Android privilege manager with optional ADB/root extension | P0 | M1 + M7 | PARTIAL | Official Shizuku API permission/recovery flow reviewed and patched; see docs/SHIZUKU_REVIEW.md. Embedded service and effective privilege checks remain missing; device acceptance NOT RUN. |
 | A01 | AI command explanation and debugging | P2 | M6 | TODO | Outside the M0/M1 source baseline; not implemented or acceptance-tested. |
 | A02 | Selectable local or remote AI providers | P2 | M6 | TODO | Outside the M0/M1 source baseline; not implemented or acceptance-tested. |
 | A03 | Workflow builder and reusable tasks | P2 | M6 | TODO | Outside the M0/M1 source baseline; not implemented or acceptance-tested. |
@@ -53,10 +53,10 @@ Status rule: DONE requires the register acceptance test to pass. No acceptance t
 | S06 | Audit logs and reproducible exports | P0 | M0 + M1 | TODO | No audit event store or redacted export. |
 | S07 | No mandatory cloud account | P0 | M0 | PARTIAL | No account or cloud dependency appears in source; offline acceptance has not run. |
 | S08 | Modular feature installation | P1 | M0 + M7 | TODO | Outside the M0/M1 source baseline; not implemented or acceptance-tested. |
-| P01 | Context-sensitive Access Required popup and permission routing | P0 | M0 + M1 | PARTIAL | Access Required dialog and basic recovery steps exist; full capability-specific routing is unverified. |
-| P02 | Shizuku API connection and service health/status | P0 | M1 | PARTIAL | Binder and permission state are exposed; effective UID/capability validation is absent. |
+| P01 | Context-sensitive Access Required popup and permission routing | P0 | M0 + M1 | PARTIAL | Source routes missing service before Shizuku permission, preserves the pending capability and shows errors. Two additional routing regression tests supplied; NOT RUN. See docs/SHIZUKU_REVIEW.md. |
+| P02 | Shizuku API connection and service health/status | P0 | M1 | PARTIAL | Fresh API assessment, pre-v11/denial gates and callback-driven UI added with 12 fake-API tests supplied; NOT RUN. SDK status caching and effective operation/UID checks remain limitations. |
 | P03 | Guided Developer options / wireless debugging activation and pairing | P0 | M1 | PARTIAL | Manual Developer options/Wireless debugging guidance exists; pairing and HyperOS navigation are unverified. |
-| P04 | Service stop/reboot detection and restart guidance | P0 | M1 | PARTIAL | Binder-death listener exists; reboot detection and restart guidance at next privileged action are absent. |
+| P04 | Service stop/reboot detection and restart guidance | P0 | M1 | PARTIAL | Binder death clears local grant/pending state and updates recovery. Regression source supplied; NOT RUN. Reboot receiver and HyperOS restart acceptance are still missing. |
 | P05 | Privilege capability matrix: normal app, ADB shell, and optional root | P0 | M0 | TODO | No operation-to-capability matrix. |
 | P06 | Approved ADB-shell command broker and Android package inspector | P1 | M2 | TODO | Outside the M0/M1 source baseline; not implemented or acceptance-tested. |
 | P07 | ADB/system diagnostics (logcat, dumpsys where permitted) | P1 | M2 | TODO | Outside the M0/M1 source baseline; not implemented or acceptance-tested. |

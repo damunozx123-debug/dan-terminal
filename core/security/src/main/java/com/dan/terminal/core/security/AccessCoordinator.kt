@@ -15,12 +15,16 @@ class AccessCoordinator(
         val requirement = recoveryManager.assess(capability)
         if (!requirement.granted) {
             _activeRequirement.value = requirement
+        } else if (_activeRequirement.value?.capability == capability) {
+            _activeRequirement.value = null
         }
         return requirement.granted
     }
 
     fun requestShizukuPermission() {
-        shizukuAccess.requestPermission()
+        if (!require(AccessCapability.SHIZUKU_PERMISSION) && shizukuAccess.isBinderAlive) {
+            shizukuAccess.requestPermission()
+        }
     }
 
     fun verifyPending() {
